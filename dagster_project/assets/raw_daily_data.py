@@ -1,17 +1,29 @@
+from datetime import date
+
 import yfinance as yf
 import pandas as pd
 import os
 
-from dagster import asset, Output
+from dagster import asset, Output, Shape, Field
 
+start = '2020-01-01'
+end = date.today()
+date_config_schema = Shape({
+    'start_date': Field(str, default_value=str(start), description='Start date in "YYYY-MM-DD"'),
+    'end_date': Field(str, default_value=str(end), description='End date in "YYYY-MM-DD"')
+})
 
 @asset(
     name="raw_daily_data",
     group_name="raw_daily_data",
-    kinds={"python"}
+    kinds={"python"},
+    config_schema=date_config_schema,
 )
 def raw_daily_data(context):
-    def download_daily_data(ticker="NVDA", start="2010-01-01", end=None):
+    config = context.op_config
+    start_date = config.get("start_date", str(start))
+    end_date = config.get("end_date", str(end))
+    def download_daily_data(ticker="NVDA", start=start_date, end=end_date):
         df = yf.download(ticker, start=start, end=end, interval="1d", auto_adjust=False)
 
         # Flatten column names if grouped by ticker
