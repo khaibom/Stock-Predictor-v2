@@ -1,0 +1,25 @@
+[project]
+name = "dagster_project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9,<3.14"
+dependencies = [
+    "dagster>=1.12.1",
+    "numpy>=2.0.2",
+    "pandas>=2.3.3",
+    "ta>=0.11.0",
+    "yfinance>=0.2.66",
+]
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.dagster]
+module_name = "dagster_project.definitions"
+code_location_name = "dagster_project"
+
+[tool.setuptools.packages.find]
+exclude=["dagster_project_tests"]
