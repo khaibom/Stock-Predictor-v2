@@ -57,6 +57,10 @@ def raw_daily_data(context):
     raw_df = download_daily_data(ticker)
     cleaned_df = clean_data(raw_df)
     save_data(cleaned_df, ticker)
+
+    context.log.info(cleaned_df.info())
+    context.log.info(cleaned_df.head())
+    context.log.info(cleaned_df.tail())
     return Output(cleaned_df,
                   metadata={"num_rows": cleaned_df.shape[0],
                             "num_columns": cleaned_df.shape[1],

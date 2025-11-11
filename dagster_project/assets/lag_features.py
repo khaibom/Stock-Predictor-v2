@@ -53,6 +53,10 @@ def lag_features(context, raw_daily_data):
 
     # Save
     save_lagged_data(df, ticker)
+
+    context.log.info(df.info())
+    context.log.info(df.head())
+    context.log.info(df.tail())
     return Output(df,
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],

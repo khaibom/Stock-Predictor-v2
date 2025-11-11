@@ -116,6 +116,9 @@ def indicator_features(context, lag_features):
     df = df.dropna().reset_index(drop=True)
 
     save_features(df, ticker)
+    context.log.info(df.info())
+    context.log.info(df.head())
+    context.log.info(df.tail())
     return Output(df,
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
