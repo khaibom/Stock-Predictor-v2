@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import os
 
-from dagster import asset
+from dagster import asset, Output
 
 
 @asset(
@@ -57,4 +57,8 @@ def raw_daily_data(context):
     raw_df = download_daily_data(ticker)
     cleaned_df = clean_data(raw_df)
     save_data(cleaned_df, ticker)
-    return cleaned_df
+    return Output(cleaned_df,
+                  metadata={"num_rows": cleaned_df.shape[0],
+                            "num_columns": cleaned_df.shape[1],
+                            })
+

@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-from dagster import asset
+from dagster import asset, Output
 
 
 @asset(
@@ -53,4 +53,7 @@ def lag_features(context, raw_daily_data):
 
     # Save
     save_lagged_data(df, ticker)
-    return df
+    return Output(df,
+                  metadata={"num_rows": df.shape[0],
+                            "num_columns": df.shape[1],
+                            })

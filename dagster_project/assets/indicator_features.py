@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-from dagster import asset
+from dagster import asset, Output
 from ta.trend import EMAIndicator, MACD
 from ta.momentum import RSIIndicator, StochasticOscillator, ROCIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
@@ -116,4 +116,7 @@ def indicator_features(context, lag_features):
     df = df.dropna().reset_index(drop=True)
 
     save_features(df, ticker)
-    return df
+    return Output(df,
+                  metadata={"num_rows": df.shape[0],
+                            "num_columns": df.shape[1],
+                            })
