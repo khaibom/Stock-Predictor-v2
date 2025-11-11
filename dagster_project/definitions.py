@@ -1,8 +1,8 @@
 from dagster import Definitions, load_assets_from_modules
 
-from dagster_project import assets  # noqa: TID252
+from .assets import raw_daily_data, lag_features, indicator_features
 
-all_assets = load_assets_from_modules([assets])
+all_assets = load_assets_from_modules([raw_daily_data, lag_features, indicator_features])
 
 defs = Definitions(
     assets=all_assets,
