@@ -81,7 +81,7 @@ def asset_market_raw(context):
     cleaned_df = clean_data(raw_df)
     save_data(cleaned_df, ticker)
 
-    context.log.info(cleaned_df.info())
+    print(str(cleaned_df.info()))
     context.log.info(cleaned_df.head())
     context.log.info(cleaned_df.tail())
     return Output(cleaned_df,

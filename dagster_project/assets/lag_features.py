@@ -52,7 +52,7 @@ def asset_features_lagged(context, asset_market_raw):
     # Save
     save_lagged_data(df, ticker)
 
-    context.log.info(df.info())
+    print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
     return Output(df,

@@ -115,7 +115,7 @@ def asset_features_full(context, asset_features_lagged):
     df = df.dropna().reset_index(drop=True)
 
     save_features(df, ticker)
-    context.log.info(df.info())
+    print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
     return Output(df,
