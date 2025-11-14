@@ -31,13 +31,24 @@ def asset_market_raw(context):
             df.columns = df.columns.get_level_values(0)
 
         df = df.reset_index()
-        df = df[["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"]]
+        # Standardize column names to lowercase / snake_case
+        rename_map = {
+            "Date": "date",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Adj Close": "adj_close",
+            "Volume": "volume",
+        }
+        df = df.rename(columns=rename_map)
+        df = df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
         return df
 
     def clean_data(df):
         context.log.info(f"Initial columns: {df.columns.tolist()}")
 
-        numeric_cols = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
+        numeric_cols = ["date", "open", "high", "low", "close", "adj_close", "volume"]
         for col in numeric_cols:
             if col in df.columns:
                 try:
@@ -47,14 +58,14 @@ def asset_market_raw(context):
                     context.log.error(f"Error converting column {col}: {e}")
                     raise e
 
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
         context.log.info(f"Missing values per column:\n {df.isnull().sum()}")
 
         df_cleaned = df.dropna()
-        if "Close" in df_cleaned.columns:
-            df_cleaned = df_cleaned[df_cleaned["Close"] > 1]
+        if "close" in df_cleaned.columns:
+            df_cleaned = df_cleaned[df_cleaned["close"] > 1]
 
         context.log.info(f"Remaining rows after cleaning: {len(df_cleaned)}")
         return df_cleaned
