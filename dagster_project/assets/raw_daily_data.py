@@ -14,12 +14,12 @@ date_config_schema = Shape({
 })
 
 @asset(
-    name="raw_daily_data",
+    name="asset_market_raw",
     group_name="raw_daily_data",
     kinds={"python"},
     config_schema=date_config_schema,
 )
-def raw_daily_data(context):
+def asset_market_raw(context):
     config = context.op_config
     start_date = config.get("start_date", str(start))
     end_date = config.get("end_date", str(end))

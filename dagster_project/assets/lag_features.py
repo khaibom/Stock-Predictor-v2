@@ -4,11 +4,11 @@ from dagster import asset, Output
 
 
 @asset(
-    name="lag_features",
+    name="asset_features_lagged",
     group_name="add_features",
     kinds={"python"}
 )
-def lag_features(context, raw_daily_data):
+def asset_features_lagged(context, asset_market_raw):
     def add_lag_features(df, lags=[1, 2, 3], cols=["Adj_Close", "Daily_Return"]):
         """
         Add lagged versions of selected columns.
@@ -40,7 +40,7 @@ def lag_features(context, raw_daily_data):
     # Load cleaned data
     ticker = "NVDA"
     path = f"data/raw/{ticker.lower()}_daily.csv"
-    df = raw_daily_data
+    df = asset_market_raw
     df = df.rename(columns={"Adj Close": "Adj_Close"})
 
     # Add features

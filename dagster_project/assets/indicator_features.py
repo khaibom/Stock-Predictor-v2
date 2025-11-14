@@ -7,11 +7,11 @@ from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import OnBalanceVolumeIndicator, MFIIndicator
 
 @asset(
-    name="indicator_features",
+    name="asset_features_full",
     group_name="add_features",
     kinds={"python"}
 )
-def indicator_features(context, lag_features):
+def asset_features_full(context, asset_features_lagged):
     def add_trend_indicators(df):
         # Trend indicators help the model identify **general price direction** (uptrend, downtrend, sideways)
         # over various timeframes. They’re useful for detecting persistent market behavior.
@@ -103,7 +103,7 @@ def indicator_features(context, lag_features):
 
     ticker = "NVDA"
     path = f"data/processed/{ticker.lower()}_daily_lagged.csv"
-    df = lag_features
+    df = asset_features_lagged
 
     df = add_trend_indicators(df)
     df = add_momentum_indicators(df)
