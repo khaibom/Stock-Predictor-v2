@@ -1,4 +1,4 @@
-from dagster import asset, Field
+from dagster import asset, Field, Output
 from .methods.save_data import save_data
 
 reg_config_schema = {
@@ -37,7 +37,10 @@ def target_price(context, asset_features_full):
               context=context,
               asset="target_price"
               )
-    return (df, ticker)
+    return Output((df, ticker),
+                  metadata={"num_rows": df.shape[0],
+                            "num_columns": df.shape[1],
+                            })
 
 
 
@@ -93,4 +96,7 @@ def target_updown(context, target_price):
               context=context,
               asset="target_updown"
               )
-    return (df, ticker)
+    return Output((df, ticker),
+           metadata={"num_rows": df.shape[0],
+                     "num_columns": df.shape[1],
+                     })
