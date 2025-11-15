@@ -120,4 +120,5 @@ def asset_features_full(context, asset_features_lagged):
     return Output((df, ticker),
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
+                            "ticker": ticker,
                             })

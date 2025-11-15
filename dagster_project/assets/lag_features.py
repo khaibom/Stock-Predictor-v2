@@ -54,4 +54,5 @@ def asset_features_lagged(context, asset_market_raw):
     return Output((df, ticker),
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
+                            "ticker": ticker,
                             })

@@ -99,4 +99,5 @@ def target_updown(context, target_price):
     return Output((df, ticker),
            metadata={"num_rows": df.shape[0],
                      "num_columns": df.shape[1],
+                     "ticker": ticker,
                      })

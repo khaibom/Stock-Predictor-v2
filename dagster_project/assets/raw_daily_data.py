@@ -89,5 +89,6 @@ def asset_market_raw(context):
     return Output((cleaned_df, ticker),
                   metadata={"num_rows": cleaned_df.shape[0],
                             "num_columns": cleaned_df.shape[1],
+                            "ticker": ticker,
                             })
 
