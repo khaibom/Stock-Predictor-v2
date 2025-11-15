@@ -17,7 +17,7 @@ def target_price(context, asset_features_full):
     - mode='return': y = future_return over N days
     - mode='level' : y = future_close over N days
     """
-    df = asset_features_full
+    df, ticker = asset_features_full
     n = context.op_config["days_ahead"]
     mode = context.op_config["mode"].lower()
 
@@ -35,8 +35,9 @@ def target_price(context, asset_features_full):
               filename="nvda_target_price.csv",
               dir="data/processed",
               context=context,
+              asset="target_price"
               )
-    return df
+    return (df, ticker)
 
 
 
@@ -62,7 +63,7 @@ def target_updown(context, target_price):
     - Down if return < -threshold
     - Flat if |return| <= threshold (optional; dropped if labels['flat'] is None)
     """
-    df = target_price
+    df, ticker = target_price
     n = context.op_config["days_ahead"]
     thr = context.op_config["threshold"]
     labels = context.op_config["labels"]
@@ -90,5 +91,6 @@ def target_updown(context, target_price):
               filename="nvda_target_updown.csv",
               dir="data/processed",
               context=context,
+              asset="target_updown"
               )
-    return df
+    return (df, ticker)

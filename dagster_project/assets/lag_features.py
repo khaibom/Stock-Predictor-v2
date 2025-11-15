@@ -1,7 +1,7 @@
 import os
 
 from dagster import asset, Output
-
+from .methods.save_data import save_data
 
 @asset(
     name="asset_features_lagged",
@@ -31,16 +31,8 @@ def asset_features_lagged(context, asset_market_raw):
         df["daily_return"] = df["adj_close"].pct_change()
         return df
 
-    def save_lagged_data(df, ticker="NVDA"):
-        os.makedirs("data/processed", exist_ok=True)
-        path = f"data/processed/{ticker.lower()}_daily_lagged.csv"
-        df.to_csv(path, index=False)
-        context.log.info(f"Saved lagged feature data to {path}")
-
     # Load cleaned data
-    ticker = "NVDA"
-    path = f"data/raw/{ticker.lower()}_daily.csv"
-    df = asset_market_raw
+    df, ticker = asset_market_raw
 
     # Add features
     df = add_daily_return(df)
@@ -49,13 +41,17 @@ def asset_features_lagged(context, asset_market_raw):
     # Drop initial rows with NaN (due to lagging)
     df = df.dropna().reset_index(drop=True)
 
-    # Save
-    save_lagged_data(df, ticker)
 
     print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
-    return Output(df,
+    save_data(df=df,
+              filename=f"{ticker.lower()}_daily_lagged.csv",
+              dir="data/processed",
+              context=context,
+              asset="asset_features_lagged"
+              )
+    return Output((df, ticker),
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
                             })

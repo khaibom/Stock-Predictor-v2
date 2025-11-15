@@ -5,26 +5,30 @@ import pandas as pd
 import os
 
 from dagster import asset, Output, Shape, Field
+from .methods.save_data import save_data
 
 start = '2020-01-01'
 end = date.today()
-date_config_schema = Shape({
+config_schema = Shape({
     'start_date': Field(str, default_value=str(start), description='Start date in "YYYY-MM-DD"'),
-    'end_date': Field(str, default_value=str(end), description='End date in "YYYY-MM-DD"')
+    'end_date': Field(str, default_value=str(end), description='End date in "YYYY-MM-DD"'),
+    'ticker': Field(str, default_value='NVDA', description='Yahoo Finance ticker symbol'),
 })
 
 @asset(
     name="asset_market_raw",
     group_name="raw_daily_data",
     kinds={"python"},
-    config_schema=date_config_schema,
+    config_schema=config_schema,
 )
 def asset_market_raw(context):
     config = context.op_config
     start_date = config.get("start_date", str(start))
     end_date = config.get("end_date", str(end))
-    def download_daily_data(ticker="NVDA", start=start_date, end=end_date):
-        df = yf.download(ticker, start=start, end=end, interval="1d", auto_adjust=False)
+    ticker = config.get("ticker")
+
+    def download_daily_data(tk=ticker, sd=start_date, ed=end_date):
+        df = yf.download(tickers=tk, start=sd, end=ed, interval="1d", auto_adjust=False)
 
         # Flatten column names if grouped by ticker
         if isinstance(df.columns, pd.MultiIndex):
@@ -70,21 +74,19 @@ def asset_market_raw(context):
         context.log.info(f"Remaining rows after cleaning: {len(df_cleaned)}")
         return df_cleaned
 
-    def save_data(df, ticker="NVDA"):
-        os.makedirs("data/raw", exist_ok=True)
-        path = f"data/raw/{ticker.lower()}_daily.csv"
-        df.to_csv(path, index=False)
-        context.log.info(f"Saved cleaned data to {path}")
-
-    ticker = "NVDA"
-    raw_df = download_daily_data(ticker)
+    raw_df = download_daily_data()
     cleaned_df = clean_data(raw_df)
-    save_data(cleaned_df, ticker)
 
     print(str(cleaned_df.info()))
     context.log.info(cleaned_df.head())
     context.log.info(cleaned_df.tail())
-    return Output(cleaned_df,
+    save_data(df=cleaned_df,
+              filename=f"{ticker.lower()}_daily.csv",
+              dir="data/raw",
+              context=context,
+              asset="asset_market_raw"
+              )
+    return Output((cleaned_df, ticker),
                   metadata={"num_rows": cleaned_df.shape[0],
                             "num_columns": cleaned_df.shape[1],
                             })

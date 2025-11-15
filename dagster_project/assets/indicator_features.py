@@ -6,6 +6,8 @@ from ta.momentum import RSIIndicator, StochasticOscillator, ROCIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import OnBalanceVolumeIndicator, MFIIndicator
 
+from .methods.save_data import save_data
+
 @asset(
     name="asset_features_full",
     group_name="add_features",
@@ -95,15 +97,7 @@ def asset_features_full(context, asset_features_lagged):
         df["High_Low_Spread"] = (df["high"] - df["low"]) / df["close"]
         return df
 
-    def save_features(df, ticker="NVDA"):
-        path = f"data/processed/{ticker.lower()}_features.csv"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        df.to_csv(path, index=False)
-        print(f"Saved indicator feature data to: {path}")
-
-    ticker = "NVDA"
-    path = f"data/processed/{ticker.lower()}_daily_lagged.csv"
-    df = asset_features_lagged
+    df, ticker = asset_features_lagged
 
     df = add_trend_indicators(df)
     df = add_momentum_indicators(df)
@@ -114,11 +108,16 @@ def asset_features_full(context, asset_features_lagged):
     # Drop initial rows with NaN ()
     df = df.dropna().reset_index(drop=True)
 
-    save_features(df, ticker)
     print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
-    return Output(df,
+    save_data(df=df,
+              filename=f"{ticker.lower()}_features.csv",
+              dir="data/processed",
+              context=context,
+              asset="asset_features_full"
+              )
+    return Output((df, ticker),
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
                             })
