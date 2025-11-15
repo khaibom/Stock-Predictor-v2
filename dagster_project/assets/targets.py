@@ -46,10 +46,10 @@ def target_price(context, asset_features_full):
 
 clf_config_schema = {
     "days_ahead": Field(int, default_value=1, description="Prediction horizon in trading days"),
-    "threshold": Field(float, default_value=0.0, description="Neutral band for classification (e.g., 0.001 = 0.1%)"),
+    "threshold": Field(float, default_value=0.005, description="Neutral band for classification (e.g., 0.001 = 0.1%)"),
     "labels": Field(
         dict,
-        default_value={"up": 1, "down": 0, "flat": None},
+        default_value={"up": 1, "down": -1, "flat": 0},
         description="Label mapping; set flat=None to drop neutral samples",
     ),
 }
