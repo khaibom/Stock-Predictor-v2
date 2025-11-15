@@ -1,4 +1,5 @@
 from dagster import asset, Field
+from .methods.save_data import save_data
 
 reg_config_schema = {
     "days_ahead": Field(int, default_value=1, description="Prediction horizon in trading days"),
@@ -30,6 +31,11 @@ def target_price(context, asset_features_full):
     print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
+    save_data(df=df,
+              filename="nvda_target_price.csv",
+              dir="data/processed",
+              context=context,
+              )
     return df
 
 
@@ -80,4 +86,9 @@ def target_updown(context, target_price):
     print(str(df.info()))
     context.log.info(df.head())
     context.log.info(df.tail())
+    save_data(df=df,
+              filename="nvda_target_updown.csv",
+              dir="data/processed",
+              context=context,
+              )
     return df
