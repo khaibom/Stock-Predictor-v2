@@ -648,10 +648,12 @@ dependencies = [
     { name = "dagster-webserver" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "mplfinance" },
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pandas" },
+    { name = "plotly" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "seaborn" },
@@ -664,8 +666,10 @@ requires-dist = [
     { name = "dagster", specifier = ">=1.12.1" },
     { name = "dagster-webserver", specifier = ">=1.12.1" },
     { name = "matplotlib", specifier = ">=3.9.4" },
+    { name = "mplfinance", specifier = ">=0.12.10b0" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "pandas", specifier = ">=2.3.3" },
+    { name = "plotly", specifier = ">=6.4.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "ta", specifier = ">=0.11.0" },
@@ -1595,6 +1599,20 @@ wheels = [
 ]
 
 [[package]]
+name = "mplfinance"
+version = "0.12.10b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/a9/34e7998d02fb58fae04f750444ce4e95e75f3a08dad17fb2d32098a97834/mplfinance-0.12.10b0.tar.gz", hash = "sha256:7da150b5851aa5119ad6e06b55e48338b619bb6773f1b85df5de67a5ffd917bf", size = 70117, upload-time = "2023-08-02T15:13:53.829Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/d9/31c436ea7673c21a5bf3fc747bc7f63377582dfe845c3004d3e46f9deee0/mplfinance-0.12.10b0-py3-none-any.whl", hash = "sha256:76d3b095f05ff35de730751649de063bea4064d0c49b21b6182c82997a7f52bb", size = 75016, upload-time = "2023-08-02T15:13:52.022Z" },
+]
+
+[[package]]
 name = "multidict"
 version = "6.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1719,6 +1737,15 @@ name = "multitasking"
 version = "0.0.12"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/17/0d/74f0293dfd7dcc3837746d0138cbedd60b31701ecc75caec7d3f281feba0/multitasking-0.0.12.tar.gz", hash = "sha256:2fba2fa8ed8c4b85e227c5dd7dc41c7d658de3b6f247927316175a57349b84d1", size = 19984, upload-time = "2025-07-20T21:27:51.636Z" }
+
+[[package]]
+name = "narwhals"
+version = "2.12.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/f8/e1c28f24b641871c14ccae7ba6381f3c7827789a06e947ce975ae8a9075a/narwhals-2.12.0.tar.gz", hash = "sha256:075b6d56f3a222613793e025744b129439ecdff9292ea6615dd983af7ba6ea44", size = 590404, upload-time = "2025-11-17T10:53:28.381Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/9a/c6f79de7ba3a0a8473129936b7b90aa461d3d46fec6f1627672b1dccf4e9/narwhals-2.12.0-py3-none-any.whl", hash = "sha256:baeba5d448a30b04c299a696bd9ee5ff73e4742143e06c49ca316b46539a7cbb", size = 425014, upload-time = "2025-11-17T10:53:26.65Z" },
+]
 
 [[package]]
 name = "numpy"
@@ -2183,6 +2210,19 @@ resolution-markers = [
 sdist = { url = "https://files.pythonhosted.org/packages/61/33/9611380c2bdb1225fdef633e2a9610622310fed35ab11dac9620972ee088/platformdirs-4.5.0.tar.gz", hash = "sha256:70ddccdd7c99fc5942e9fc25636a8b34d04c24b335100223152c2803e4063312", size = 21632, upload-time = "2025-10-08T17:44:48.791Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/73/cb/ac7874b3e5d58441674fb70742e6c374b28b0c7cb988d37d991cde47166c/platformdirs-4.5.0-py3-none-any.whl", hash = "sha256:e578a81bb873cbb89a41fcc904c7ef523cc18284b7e3b3ccf06aca1403b7ebd3", size = 18651, upload-time = "2025-10-08T17:44:47.223Z" },
+]
+
+[[package]]
+name = "plotly"
+version = "6.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/e6/b768650072837505804bed4790c5449ba348a3b720e27ca7605414e998cd/plotly-6.4.0.tar.gz", hash = "sha256:68c6db2ed2180289ef978f087841148b7efda687552276da15a6e9b92107052a", size = 7012379, upload-time = "2025-11-04T17:59:26.45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/ae/89b45ccccfeebc464c9233de5675990f75241b8ee4cd63227800fdf577d1/plotly-6.4.0-py3-none-any.whl", hash = "sha256:a1062eafbdc657976c2eedd276c90e184ccd6c21282a5e9ee8f20efca9c9a4c5", size = 9892458, upload-time = "2025-11-04T17:59:22.622Z" },
 ]
 
 [[package]]
