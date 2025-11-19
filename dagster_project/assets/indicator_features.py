@@ -111,7 +111,7 @@ def asset_features_full(context, asset_features_lagged):
 
     log_df(df, context, 'asset_features_full')
     save_data(df=df,
-              filename=f"{ticker.lower()}_features.csv",
+              filename=f"{ticker}_features.csv",
               dir="data/processed",
               context=context,
               asset="asset_features_full"

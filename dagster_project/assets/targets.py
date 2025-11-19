@@ -31,7 +31,7 @@ def target_price(context, asset_features_full):
 
     log_df(df, context, 'target_price')
     save_data(df=df,
-              filename="nvda_target_price.csv",
+              filename=f"{ticker}_target_price.csv",
               dir="data/processed",
               context=context,
               asset="target_price"
@@ -88,7 +88,7 @@ def target_updown(context, target_price):
 
     log_df(df, context, 'target_updown')
     save_data(df=df,
-              filename="nvda_target_updown.csv",
+              filename=f"{ticker}_target_updown.csv",
               dir="data/processed",
               context=context,
               asset="target_updown"

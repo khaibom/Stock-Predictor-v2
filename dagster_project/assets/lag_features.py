@@ -44,7 +44,7 @@ def asset_features_lagged(context, asset_market_raw):
 
     log_df(df, context, 'asset_features_lagged')
     save_data(df=df,
-              filename=f"{ticker.lower()}_daily_lagged.csv",
+              filename=f"{ticker}_daily_lagged.csv",
               dir="data/processed",
               context=context,
               asset="asset_features_lagged"

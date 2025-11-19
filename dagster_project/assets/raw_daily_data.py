@@ -79,7 +79,7 @@ def asset_market_raw(context):
 
     log_df(cleaned_df, context, 'asset_market_raw')
     save_data(df=cleaned_df,
-              filename=f"{ticker.lower()}_daily.csv",
+              filename=f"{ticker}_daily.csv",
               dir="data/raw",
               context=context,
               asset="asset_market_raw"
