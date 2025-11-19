@@ -3,7 +3,7 @@ import pandas as pd
 from dagster import asset, Output
 from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler
 from .methods.save_data import save_data
-
+from .methods.logging import log_df
 
 @asset(
     name="asset_preprocessed_data",
@@ -171,6 +171,19 @@ def asset_preprocessed_data(context, target_updown):
     save_data(df=y_train_reg, filename=f"{ticker}_y_train_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
     save_data(df=y_val_reg, filename=f"{ticker}_y_val_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
     save_data(df=y_test_reg, filename=f"{ticker}_y_test_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
+
+    log_df(X_train_scaled,context, 'X_train_scaled')
+    log_df(X_val_scaled,context, 'X_val_scaled')
+    log_df(X_test_scaled,context, 'X_test_scaled')
+    log_df(X_predict_scaled,context, 'X_predict_scaled')
+
+    log_df(y_train_cls,context, 'y_train_cls')
+    log_df(y_val_cls,context, 'y_val_cls')
+    log_df(y_test_cls,context, 'y_test_cls')
+
+    log_df(y_train_reg,context, 'y_train_reg')
+    log_df(y_val_reg,context, 'y_val_reg')
+    log_df(y_test_reg,context, 'y_test_reg')
 
     output_value = {
         "ticker": ticker,

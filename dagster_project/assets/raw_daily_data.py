@@ -2,10 +2,10 @@ from datetime import date
 
 import yfinance as yf
 import pandas as pd
-import os
 
 from dagster import asset, Output, Shape, Field
 from .methods.save_data import save_data
+from .methods.logging import log_df
 
 start = '2020-01-01'
 end = date.today()
@@ -77,9 +77,7 @@ def asset_market_raw(context):
     raw_df = download_daily_data()
     cleaned_df = clean_data(raw_df)
 
-    print(str(cleaned_df.info()))
-    context.log.info(cleaned_df.head())
-    context.log.info(cleaned_df.tail())
+    log_df(cleaned_df, context, 'asset_market_raw')
     save_data(df=cleaned_df,
               filename=f"{ticker.lower()}_daily.csv",
               dir="data/raw",

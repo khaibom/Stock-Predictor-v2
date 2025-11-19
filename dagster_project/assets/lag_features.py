@@ -2,6 +2,7 @@ import os
 
 from dagster import asset, Output
 from .methods.save_data import save_data
+from .methods.logging import log_df
 
 @asset(
     name="asset_features_lagged",
@@ -41,10 +42,7 @@ def asset_features_lagged(context, asset_market_raw):
     # Drop initial rows with NaN (due to lagging)
     df = df.dropna().reset_index(drop=True)
 
-
-    print(str(df.info()))
-    context.log.info(df.head())
-    context.log.info(df.tail())
+    log_df(df, context, 'asset_features_lagged')
     save_data(df=df,
               filename=f"{ticker.lower()}_daily_lagged.csv",
               dir="data/processed",
