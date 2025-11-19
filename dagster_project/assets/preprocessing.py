@@ -17,10 +17,19 @@ def asset_preprocessed_data(context, target_updown):
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)
 
+    # days since first date
+    df["date_days"] = (df["date"] - df["date"].min()).dt.days
+
+    # cyclic encodings for weekday and month
+    df["dow_sin"] = np.sin(2 * np.pi * df["date"].dt.weekday / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["date"].dt.weekday / 7)
+    df["month_sin"] = np.sin(2 * np.pi * (df["date"].dt.month - 1) / 12)
+    df["month_cos"] = np.cos(2 * np.pi * (df["date"].dt.month - 1) / 12)
+
     #targets + features
     target_cls = "y_updown_1d"
     target_reg = "y_price_return_1d"
-    features = [c for c in df.columns if c not in (target_cls, target_reg, "date")]
+    features = [c for c in df.columns if c not in (target_cls, target_reg, "date", "close")] # use adj_close instead of close
 
     bounded_01 = ["RSI_14", "Stoch_k", "Stoch_d", "MFI_14"]
 
@@ -44,17 +53,26 @@ def asset_preprocessed_data(context, target_updown):
         return np.sign(x) * np.log1p(np.abs(x))
 
     X = df.loc[:, features].copy()
-    y_cls = df[target_cls].copy()
-    y_reg = df[target_reg].copy()
 
     # 1) bounded 0-100 -> [0,1]
     for c in bounded_01:
         X[c] = X[c] / 100.0
 
     # 2) Time-based split
+    # last row as X_predict
+    X_predict = X.iloc[[-1]].copy()
+    X = X.iloc[:-1].copy()
+
+    y_cls = df[target_cls].copy()[:-1]
+    y_reg = df[target_reg].copy()[:-1]
+
+    last_close = float(df["close"].iloc[-1])   # yesterday's close, for price prediction
+    last_date = df["date"].iloc[-1]
+
     n = len(X)
     train_ratio = 0.7
-    val_ratio = 0.15   # test = 0.15
+    val_ratio = 0.15
+    # => test = 0.15
 
     n_train = int(n * train_ratio)
     n_val = int(n * val_ratio)
@@ -80,6 +98,7 @@ def asset_preprocessed_data(context, target_updown):
             X_train[c] = np.log1p(X_train[c].clip(lower=0))
             X_val[c] = np.log1p(X_val[c].clip(lower=0))
             X_test[c] = np.log1p(X_test[c].clip(lower=0))
+            X_predict[c] = np.log1p(X_predict[c].clip(lower=0))
 
         cols = [c for c in heavy_pos if c in X_train.columns]
         if cols:
@@ -87,6 +106,7 @@ def asset_preprocessed_data(context, target_updown):
             X_train[cols] = robust_scaler.transform(X_train[cols])
             X_val[cols] = robust_scaler.transform(X_val[cols])
             X_test[cols] = robust_scaler.transform(X_test[cols])
+            X_predict[cols] = robust_scaler.transform(X_predict[cols])
 
     # 3.2) OBV -> signed log1p then StandardScaler (or RobustScaler if extremely spiky)
     if heavy_signed_obv:
@@ -96,12 +116,14 @@ def asset_preprocessed_data(context, target_updown):
                 X_train[c] = signed_log1p(X_train[c].astype(float))
                 X_val[c] = signed_log1p(X_val[c].astype(float))
                 X_test[c] = signed_log1p(X_test[c].astype(float))
+                X_predict[c] = signed_log1p(X_predict[c].astype(float))
 
             std_obv = StandardScaler()
             std_obv.fit(X_train[cols])
             X_train[cols] = std_obv.transform(X_train[cols])
             X_val[cols] = std_obv.transform(X_val[cols])
             X_test[cols] = std_obv.transform(X_test[cols])
+            X_predict[cols] = std_obv.transform(X_predict[cols])
 
     # 3.3) zero-centered indicators & returns -> StandardScaler
     cols = [c for c in zero_center_std if c in X_train.columns]
@@ -111,6 +133,7 @@ def asset_preprocessed_data(context, target_updown):
         X_train[cols] = std_zero.transform(X_train[cols])
         X_val[cols] = std_zero.transform(X_val[cols])
         X_test[cols] = std_zero.transform(X_test[cols])
+        X_predict[cols] = std_zero.transform(X_predict[cols])
 
     # 3.4) price-like levels -> StandardScaler  (consider replacing with relative features before this step)
     cols = [c for c in price_like_std if c in X_train.columns]
@@ -120,6 +143,7 @@ def asset_preprocessed_data(context, target_updown):
         X_train[cols] = std_price.transform(X_train[cols])
         X_val[cols] = std_price.transform(X_val[cols])
         X_test[cols] = std_price.transform(X_test[cols])
+        X_predict[cols] = std_price.transform(X_predict[cols])
 
     # 4) LSTM-friendly range on everything (except labels), you can add:
     mm_all = MinMaxScaler(feature_range=(-1, 1))
@@ -128,14 +152,17 @@ def asset_preprocessed_data(context, target_updown):
     X_train_scaled = mm_all.transform(X_train)
     X_val_scaled = mm_all.transform(X_val)
     X_test_scaled = mm_all.transform(X_test)
+    X_predict_scaled = mm_all.transform(X_predict)
 
     X_train_scaled = pd.DataFrame(X_train_scaled, columns=features, index=X_train.index)
     X_val_scaled = pd.DataFrame(X_val_scaled, columns=features, index=X_val.index)
     X_test_scaled = pd.DataFrame(X_test_scaled, columns=features, index=X_test.index)
+    X_predict_scaled = pd.DataFrame(X_predict_scaled, columns=features, index=X_predict.index)
 
     save_data(df=X_train_scaled, filename=f"{ticker}_X_train_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
     save_data(df=X_val_scaled, filename=f"{ticker}_X_val_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
     save_data(df=X_test_scaled, filename=f"{ticker}_X_test_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
+    save_data(df=X_predict_scaled, filename=f"{ticker}_X_predict_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
 
     save_data(df=y_train_cls, filename=f"{ticker}_y_train_cls.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
     save_data(df=y_val_cls, filename=f"{ticker}_y_val_cls.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
@@ -151,12 +178,15 @@ def asset_preprocessed_data(context, target_updown):
         "X_train": X_train_scaled,
         "X_val": X_val_scaled,
         "X_test": X_test_scaled,
+        "X_predict": X_predict_scaled,
         "y_train_cls": y_train_cls,
         "y_val_cls": y_val_cls,
         "y_test_cls": y_test_cls,
         "y_train_reg": y_train_reg,
         "y_val_reg": y_val_reg,
         "y_test_reg": y_test_reg,
+        "last_close": last_close,
+        "last_date": last_date,
     }
     metadata = {
         "train_rows": len(X_train),
@@ -164,6 +194,8 @@ def asset_preprocessed_data(context, target_updown):
         "test_rows": len(X_test),
         "n_features": len(features),
         "ticker": ticker,
+        "last_close": last_close,
+        "last_date-predict": str(last_date),
     }
 
     return Output(value=output_value, metadata=metadata)
