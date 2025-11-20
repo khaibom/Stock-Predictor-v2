@@ -42,6 +42,8 @@ def asset_features_lagged(context, asset_market_raw):
     # Drop initial rows with NaN (due to lagging)
     df = df.dropna().reset_index(drop=True)
 
+    print(f"\n[asset_features_lagged] Shape: {df.shape} | Columns & Types:\n{df.dtypes}\n")
+
     log_df(df, context, 'asset_features_lagged')
     save_data(df=df,
               filename=f"{ticker}_daily_lagged.csv",

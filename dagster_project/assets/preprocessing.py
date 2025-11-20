@@ -89,6 +89,7 @@ def asset_preprocessed_data(context, target_updown):
     y_val_reg = y_reg[n_train:n_train + n_val]
     y_test_reg = y_reg[n_train + n_val:]
 
+    print(f"\n[asset_preprocessed_data - BEFORE SCALING] X_train: {X_train.shape} | Columns & Types:\n{X_train.dtypes}\n")
 
     # 3) Fit scalers on TRAIN only, then transform all splits
     # 3.1) heavy positive -> log1p then RobustScaler
@@ -158,6 +159,8 @@ def asset_preprocessed_data(context, target_updown):
     X_val_scaled = pd.DataFrame(X_val_scaled, columns=features, index=X_val.index)
     X_test_scaled = pd.DataFrame(X_test_scaled, columns=features, index=X_test.index)
     X_predict_scaled = pd.DataFrame(X_predict_scaled, columns=features, index=X_predict.index)
+
+    print(f"\n[asset_preprocessed_data - AFTER SCALING] X_train_scaled: {X_train_scaled.shape} | Columns & Types:\n{X_train_scaled.dtypes}\n")
 
     save_data(df=X_train_scaled, filename=f"{ticker}_X_train_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
     save_data(df=X_val_scaled, filename=f"{ticker}_X_val_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")

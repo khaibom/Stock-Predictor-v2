@@ -109,6 +109,8 @@ def asset_features_full(context, asset_features_lagged):
     # Drop initial rows with NaN ()
     df = df.dropna().reset_index(drop=True)
 
+    print(f"\n[asset_features_full] Shape: {df.shape} | Columns & Types:\n{df.dtypes}\n")
+
     log_df(df, context, 'asset_features_full')
     save_data(df=df,
               filename=f"{ticker}_features.csv",

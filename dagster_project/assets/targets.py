@@ -29,6 +29,8 @@ def target_price(context, asset_features_full):
     else:  # default 'return'
         df[f"y_price_return_{n}d"] = (future_close / df["close"]) - 1.0
 
+    print(f"\n[target_price] Shape: {df.shape} | Columns & Types:\n{df.dtypes}\n")
+
     log_df(df, context, 'target_price')
     save_data(df=df,
               filename=f"{ticker}_target_price.csv",
@@ -85,6 +87,7 @@ def target_updown(context, target_price):
 
     df[f"y_updown_{n}d"] = future_ret.apply(map_dir)
 
+    print(f"\n[target_updown] Shape: {df.shape} | Columns & Types:\n{df.dtypes}\n")
 
     log_df(df, context, 'target_updown')
     save_data(df=df,
