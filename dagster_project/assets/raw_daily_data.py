@@ -7,12 +7,12 @@ from dagster import asset, Output, Shape, Field
 from .methods.save_data import save_data
 from .methods.logging import log_df
 
-start = '2020-01-01'
+start = '2015-01-01'
 end = date.today()
 config_schema = Shape({
     'start_date': Field(str, default_value=str(start), description='Start date in "YYYY-MM-DD"'),
     'end_date': Field(str, default_value=str(end), description='End date in "YYYY-MM-DD"'),
-    'ticker': Field(str, default_value='NVDA', description='Yahoo Finance ticker symbol'),
+    'ticker': Field(str, default_value='NVD.DE', description='Yahoo Finance ticker symbol'),
 })
 
 @asset(
@@ -80,7 +80,7 @@ def asset_market_raw(context):
     log_df(cleaned_df, context, 'asset_market_raw')
     save_data(df=cleaned_df,
               filename=f"{ticker}_daily.csv",
-              dir="data/raw",
+              dir=f"data/raw/{ticker}",
               context=context,
               asset="asset_market_raw"
               )

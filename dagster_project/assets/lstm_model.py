@@ -53,6 +53,9 @@ def plot_training_history(history, ticker: str, model_type: str, save_path: Path
     """
     Plot training/validation loss curves.
     """
+    # Ensure parent directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    
     plt.figure(figsize=(12, 5))
     
     # Plot 1: Loss
@@ -92,6 +95,9 @@ def plot_predictions_comparison(y_true, y_pred, ticker: str, model_type: str, sa
     """
     Plot true vs predicted values on test set.
     """
+    # Ensure parent directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    
     plt.figure(figsize=(12, 5))
     
     # Plot 1: All predictions
@@ -125,6 +131,9 @@ def plot_scatter_comparison(y_true, y_pred, ticker: str, model_type: str, save_p
     """
     Scatter plot of true vs predicted values.
     """
+    # Ensure parent directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    
     plt.figure(figsize=(8, 8))
     
     plt.scatter(y_true, y_pred, alpha=0.5, s=20)
@@ -152,6 +161,9 @@ def plot_confusion_matrix_chart(cm, ticker: str, save_path: Path):
     Plot confusion matrix for classification.
     """
     import seaborn as sns
+    
+    # Ensure parent directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
@@ -460,7 +472,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
         ),
         # Save best model checkpoint
         callbacks.ModelCheckpoint(
-            filepath=str(MODEL_DIR / f"{ticker}_best_model_reg.keras"),
+            filepath=str(MODEL_DIR / ticker / f"{ticker}_best_model_reg.keras"),
             monitor="val_loss",
             save_best_only=True,
             verbose=0,
@@ -497,19 +509,19 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
 
     # Generate visualizations
     context.log.info("[REGRESSION] Generating training history plot...")
-    training_plot_path = CHARTS_DIR / f"{ticker}_training_history_reg.png"
+    training_plot_path = CHARTS_DIR / ticker / f"{ticker}_training_history_reg.png"
     plot_training_history(history, ticker, "LSTM Regression", training_plot_path)
     
     context.log.info("[REGRESSION] Generating predictions comparison plot...")
-    predictions_plot_path = CHARTS_DIR / f"{ticker}_predictions_comparison_reg.png"
+    predictions_plot_path = CHARTS_DIR / ticker / f"{ticker}_predictions_comparison_reg.png"
     plot_predictions_comparison(y_test_seq, y_test_pred, ticker, "LSTM Regression", predictions_plot_path)
     
     context.log.info("[REGRESSION] Generating scatter plot...")
-    scatter_plot_path = CHARTS_DIR / f"{ticker}_scatter_reg.png"
+    scatter_plot_path = CHARTS_DIR / ticker / f"{ticker}_scatter_reg.png"
     plot_scatter_comparison(y_test_seq, y_test_pred, ticker, "LSTM Regression", scatter_plot_path)
 
     # Save model
-    model_path = MODEL_DIR / f"{ticker}_lstm_model_reg.keras"
+    model_path = MODEL_DIR / ticker / f"{ticker}_lstm_model_reg.keras"
     model.save(model_path)
     context.log.info(f"[REGRESSION] Model saved to {model_path}")
 
@@ -536,7 +548,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     save_data(
         df=history_df,
         filename=f"{ticker}_training_history_reg.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_trained_model_reg"
     )
@@ -549,7 +561,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     save_data(
         df=test_results_df,
         filename=f"{ticker}_test_predictions_reg.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_trained_model_reg"
     )
@@ -665,7 +677,7 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
     save_data(
         df=predictions_df,
         filename=f"{ticker}_latest_predictions_reg.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_predictions_reg"
     )
@@ -812,7 +824,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
         ),
         # Save best model checkpoint
         callbacks.ModelCheckpoint(
-            filepath=str(MODEL_DIR / f"{ticker}_best_model_cls.keras"),
+            filepath=str(MODEL_DIR / ticker / f"{ticker}_best_model_cls.keras"),
             monitor="val_accuracy",
             save_best_only=True,
             mode='max',
@@ -869,19 +881,19 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
 
     # Generate visualizations
     context.log.info("[CLASSIFICATION] Generating training history plot...")
-    training_plot_path = CHARTS_DIR / f"{ticker}_training_history_cls.png"
+    training_plot_path = CHARTS_DIR / ticker / f"{ticker}_training_history_cls.png"
     plot_training_history(history, ticker, "LSTM Classification", training_plot_path)
     
     context.log.info("[CLASSIFICATION] Generating predictions comparison plot...")
-    predictions_plot_path = CHARTS_DIR / f"{ticker}_predictions_comparison_cls.png"
+    predictions_plot_path = CHARTS_DIR / ticker / f"{ticker}_predictions_comparison_cls.png"
     plot_predictions_comparison(y_test_seq, y_test_pred, ticker, "LSTM Classification", predictions_plot_path)
     
     context.log.info("[CLASSIFICATION] Generating confusion matrix plot...")
-    cm_plot_path = CHARTS_DIR / f"{ticker}_confusion_matrix_cls.png"
+    cm_plot_path = CHARTS_DIR / ticker / f"{ticker}_confusion_matrix_cls.png"
     plot_confusion_matrix_chart(cm, ticker, cm_plot_path)
 
     # Save model
-    model_path = MODEL_DIR / f"{ticker}_lstm_model_cls.keras"
+    model_path = MODEL_DIR / ticker / f"{ticker}_lstm_model_cls.keras"
     model.save(model_path)
     context.log.info(f"[CLASSIFICATION] Model saved to {model_path}")
 
@@ -908,7 +920,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     save_data(
         df=history_df,
         filename=f"{ticker}_training_history_cls.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_trained_model_cls"
     )
@@ -924,7 +936,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     save_data(
         df=test_results_df,
         filename=f"{ticker}_test_predictions_cls.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_trained_model_cls"
     )
@@ -1058,7 +1070,7 @@ def lstm_predictions_cls(context, asset_preprocessed_data, lstm_trained_model_cl
     save_data(
         df=predictions_df,
         filename=f"{ticker}_latest_predictions_cls.csv",
-        dir="models",
+        dir=f"models/{ticker}",
         context=context,
         asset="lstm_predictions_cls"
     )

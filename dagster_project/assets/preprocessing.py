@@ -159,18 +159,18 @@ def asset_preprocessed_data(context, target_updown):
     X_test_scaled = pd.DataFrame(X_test_scaled, columns=features, index=X_test.index)
     X_predict_scaled = pd.DataFrame(X_predict_scaled, columns=features, index=X_predict.index)
 
-    save_data(df=X_train_scaled, filename=f"{ticker}_X_train_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=X_val_scaled, filename=f"{ticker}_X_val_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=X_test_scaled, filename=f"{ticker}_X_test_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=X_predict_scaled, filename=f"{ticker}_X_predict_scaled.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
+    save_data(df=X_train_scaled, filename=f"{ticker}_X_train_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=X_val_scaled, filename=f"{ticker}_X_val_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=X_test_scaled, filename=f"{ticker}_X_test_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=X_predict_scaled, filename=f"{ticker}_X_predict_scaled.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
 
-    save_data(df=y_train_cls, filename=f"{ticker}_y_train_cls.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=y_val_cls, filename=f"{ticker}_y_val_cls.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=y_test_cls, filename=f"{ticker}_y_test_cls.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_train_cls, filename=f"{ticker}_y_train_cls.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_val_cls, filename=f"{ticker}_y_val_cls.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_test_cls, filename=f"{ticker}_y_test_cls.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
 
-    save_data(df=y_train_reg, filename=f"{ticker}_y_train_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=y_val_reg, filename=f"{ticker}_y_val_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
-    save_data(df=y_test_reg, filename=f"{ticker}_y_test_reg.csv", dir="data/processed", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_train_reg, filename=f"{ticker}_y_train_reg.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_val_reg, filename=f"{ticker}_y_val_reg.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
+    save_data(df=y_test_reg, filename=f"{ticker}_y_test_reg.csv", dir=f"data/processed/{ticker}", context=context, asset="asset_preprocessed_data")
 
     log_df(X_train_scaled,context, 'X_train_scaled')
     log_df(X_val_scaled,context, 'X_val_scaled')
