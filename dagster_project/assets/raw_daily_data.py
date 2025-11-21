@@ -7,7 +7,7 @@ from dagster import asset, Output, Shape, Field
 from .methods.save_data import save_data
 from .methods.logging import log_df
 
-start = '2015-01-01'
+start = '2010-01-01'
 end = date.today()
 config_schema = Shape({
     'start_date': Field(str, default_value=str(start), description='Start date in "YYYY-MM-DD"'),

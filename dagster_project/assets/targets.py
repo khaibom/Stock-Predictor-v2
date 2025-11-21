@@ -4,7 +4,7 @@ from .methods.save_data import save_data
 from .methods.logging import log_df
 
 reg_config_schema = {
-    "days_ahead": Field(int, default_value=3, description="Prediction horizon in TRADING days (weekends excluded automatically)"),
+    "days_ahead": Field(int, default_value=1, description="Prediction horizon in TRADING days (weekends excluded automatically)"),
     "mode": Field(str, default_value="return", description="Target type: 'return' or 'level'"),
 }
 @asset(
@@ -43,16 +43,17 @@ def target_price(context, asset_features_full):
               context=context,
               asset="target_price"
               )
-    return Output((df, ticker),
+    return Output((df, ticker, n),  # Return days_ahead for dynamic column name construction
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
+                            "days_ahead": n,
                             })
 
 
 
 clf_config_schema = {
-    "days_ahead": Field(int, default_value=3, description="Prediction horizon in TRADING days (weekends excluded)"),
-    "threshold": Field(float, default_value=0.025, description="Threshold for binary classification (e.g., 0.025 = 2.5%). Movements < threshold are DROPPED."),
+    "days_ahead": Field(int, default_value=1, description="Prediction horizon in TRADING days (weekends excluded)"),
+    "threshold": Field(float, default_value=0.01, description="Threshold for binary classification (e.g., 0.01 = 1.0%). Movements < threshold are DROPPED."),
     "mode": Field(str, default_value="binary", description="'binary' (Up/Down only) or 'ternary' (Up/Down/Flat)"),
 }
 @asset(
@@ -72,8 +73,12 @@ def target_updown(context, target_price):
     
     NOTE: Uses n TRADING days ahead (weekends auto-skipped).
     """
-    df, ticker = target_price
+    df, ticker, n_from_price = target_price  # Get days_ahead from target_price
     n = context.op_config["days_ahead"]
+    
+    # Verify consistency between regression and classification configs
+    if n != n_from_price:
+        context.log.warning(f"Classification days_ahead ({n}) != Regression days_ahead ({n_from_price}). Using classification config ({n}).")
     thr = context.op_config["threshold"]
     mode = context.op_config["mode"]
 
@@ -132,8 +137,9 @@ def target_updown(context, target_price):
               context=context,
               asset="target_updown"
               )
-    return Output((df, ticker),
+    return Output((df, ticker, n),  # Return days_ahead for dynamic column name construction
            metadata={"num_rows": df.shape[0],
                      "num_columns": df.shape[1],
                      "ticker": ticker,
+                     "days_ahead": n,
                      })

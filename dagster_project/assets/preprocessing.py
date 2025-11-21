@@ -11,7 +11,7 @@ from .methods.logging import log_df
     kinds={"python"}
 )
 def asset_preprocessed_data(context, target_updown):
-    df, ticker = target_updown
+    df, ticker, days_ahead = target_updown  # Unpack days_ahead from target_updown
 
     # sort by time for time series split
     df["date"] = pd.to_datetime(df["date"])
@@ -26,12 +26,12 @@ def asset_preprocessed_data(context, target_updown):
     df["month_sin"] = np.sin(2 * np.pi * (df["date"].dt.month - 1) / 12)
     df["month_cos"] = np.cos(2 * np.pi * (df["date"].dt.month - 1) / 12)
 
-    #targets + features (updated to 3-day prediction)
-    target_cls = "y_updown_3d"  # Changed from 1d to 3d
-    target_reg = "y_price_return_3d"  # Changed from 1d to 3d
+    # Construct target column names dynamically based on days_ahead from upstream assets
+    target_cls = f"y_updown_{days_ahead}d"  # Dynamic: automatically matches config
+    target_reg = f"y_price_return_{days_ahead}d"  # Dynamic: automatically matches config
     features = [c for c in df.columns if c not in (target_cls, target_reg, "date", "close")] # use adj_close instead of close
     
-    context.log.info(f"Using targets: regression='{target_reg}', classification='{target_cls}'")
+    context.log.info(f"Using targets (days_ahead={days_ahead}): regression='{target_reg}', classification='{target_cls}'")
 
     # Features bounded to [0, 1] or [0, 100] range
     bounded_01 = [
