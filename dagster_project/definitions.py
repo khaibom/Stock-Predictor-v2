@@ -14,7 +14,7 @@ from .jobs import (
     job_ensemble_full,
     job_compare_models,
 )
-from .schedules import schedule_tuesday_saturday_0000
+from .schedules import schedule_tuesday_saturday_0005
 
 all_assets = load_assets_from_modules([raw_daily_data, lag_features, indicator_features, targets, preprocessing, lstm_model, xgboost_model, ensemble_model])
 
@@ -41,7 +41,7 @@ all_jobs = [
     job_compare_models,
 ]
 
-all_schedules = [schedule_tuesday_saturday_0000]
+all_schedules = [schedule_tuesday_saturday_0005]
 
 defs = Definitions(
     assets=all_assets,
