@@ -1,10 +1,10 @@
 from dagster import ScheduleDefinition, DefaultScheduleStatus
 
-from .jobs import job_lstm_full
+from .jobs import job_compare_models
 
-schedule_weekday_0800 = ScheduleDefinition(
-    job=job_lstm_full,
-    cron_schedule='0 8 * * 1-5', # 08:00 Mon–Fri
+schedule_tuesday_saturday_0000 = ScheduleDefinition(
+    job=job_compare_models,
+    cron_schedule='0 0 * * 2-6', # 00:00 Tue–Sat
     execution_timezone='Europe/Berlin',
     default_status=DefaultScheduleStatus.RUNNING
 )
