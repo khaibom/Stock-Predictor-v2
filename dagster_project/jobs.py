@@ -70,6 +70,37 @@ job_xgb_full = define_asset_job(
 )
 
 # ============================================================================
+# ENSEMBLE JOBS - Combine LSTM and XGBoost
+# ============================================================================
+
+# ENSEMBLE REGRESSION job
+job_ensemble_predict_reg = define_asset_job(
+    name='ensemble_predict_pipeline_reg',
+    selection=['asset_market_raw', 'asset_features_lagged', 'asset_features_full',
+               'target_price', 'target_updown', 'asset_preprocessed_data',
+               'lstm_trained_model_reg', 'xgb_trained_model_reg',
+               'ensemble_predictions_reg'],
+)
+
+# ENSEMBLE CLASSIFICATION job
+job_ensemble_predict_cls = define_asset_job(
+    name='ensemble_predict_pipeline_cls',
+    selection=['asset_market_raw', 'asset_features_lagged', 'asset_features_full',
+               'target_price', 'target_updown', 'asset_preprocessed_data',
+               'lstm_trained_model_cls', 'xgb_trained_model_cls',
+               'ensemble_predictions_cls'],
+)
+
+# ENSEMBLE FULL job - Train and predict with ensemble for both regression and classification
+job_ensemble_full = define_asset_job(
+    name='ensemble_full_pipeline',
+    selection=['asset_market_raw', 'asset_features_lagged', 'asset_features_full', 
+               'target_price', 'target_updown', 'asset_preprocessed_data', 
+               'lstm_trained_model_reg', 'xgb_trained_model_reg', 'ensemble_predictions_reg',
+               'lstm_trained_model_cls', 'xgb_trained_model_cls', 'ensemble_predictions_cls'],
+)
+
+# ============================================================================
 # COMPARISON JOB - Run both LSTM and XGBoost
 # ============================================================================
 
@@ -83,5 +114,7 @@ job_compare_models = define_asset_job(
                'lstm_trained_model_cls', 'lstm_predictions_cls',
                # XGBoost models
                'xgb_trained_model_reg', 'xgb_predictions_reg',
-               'xgb_trained_model_cls', 'xgb_predictions_cls'],
+               'xgb_trained_model_cls', 'xgb_predictions_cls',
+               # Ensemble models
+               'ensemble_predictions_reg', 'ensemble_predictions_cls'],
 )

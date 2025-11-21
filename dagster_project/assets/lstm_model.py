@@ -19,10 +19,10 @@ tf.random.set_seed(42)
 
 # Configuration
 LOOKBACK = 60  # timesteps for LSTM window
-MODEL_DIR = Path("models")
-MODEL_DIR.mkdir(exist_ok=True)
-CHARTS_DIR = Path("models/charts")
-CHARTS_DIR.mkdir(exist_ok=True)
+MODEL_DIR = Path("models/lstm")
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+CHARTS_DIR = Path("models/lstm/charts")
+CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def make_sequences(X_df: pd.DataFrame, y_arr: np.ndarray, lookback: int):
@@ -629,7 +629,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     save_data(
         df=history_df,
         filename=f"{ticker}_training_history_reg.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_trained_model_reg"
     )
@@ -642,7 +642,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     save_data(
         df=test_results_df,
         filename=f"{ticker}_test_predictions_reg.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_trained_model_reg"
     )
@@ -757,7 +757,7 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
     save_data(
         df=predictions_df,
         filename=f"{ticker}_latest_predictions_reg.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_predictions_reg"
     )
@@ -1027,7 +1027,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     save_data(
         df=history_df,
         filename=f"{ticker}_training_history_cls.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_trained_model_cls"
     )
@@ -1062,7 +1062,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     save_data(
         df=test_results_df,
         filename=f"{ticker}_test_predictions_cls.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_trained_model_cls"
     )
@@ -1233,7 +1233,7 @@ def lstm_predictions_cls(context, asset_preprocessed_data, lstm_trained_model_cl
     save_data(
         df=predictions_df,
         filename=f"{ticker}_latest_predictions_cls.csv",
-        dir=f"models/{ticker}",
+        dir=f"models/lstm/{ticker}",
         context=context,
         asset="lstm_predictions_cls"
     )

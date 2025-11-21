@@ -21,6 +21,12 @@ from .xgboost_model import (
     xgb_predictions_cls,
 )
 
+# Ensemble assets
+from .ensemble_model import (
+    ensemble_predictions_reg,
+    ensemble_predictions_cls,
+)
+
 __all__ = [
     # Data pipeline
     "asset_market_raw",
@@ -41,5 +47,9 @@ __all__ = [
     "xgb_predictions_reg",
     "xgb_trained_model_cls",
     "xgb_predictions_cls",
+    
+    # Ensemble models
+    "ensemble_predictions_reg",
+    "ensemble_predictions_cls",
 ]
 

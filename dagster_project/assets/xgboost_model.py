@@ -20,10 +20,10 @@ from .methods.logging import log_df
 np.random.seed(42)
 
 # Configuration
-MODEL_DIR = Path("models")
-MODEL_DIR.mkdir(exist_ok=True)
-CHARTS_DIR = Path("models/charts")
-CHARTS_DIR.mkdir(exist_ok=True)
+MODEL_DIR = Path("models/xgb")
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+CHARTS_DIR = Path("models/xgb/charts")
+CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def plot_xgb_training_history(evals_result, ticker: str, model_type: str, save_path: Path):
@@ -359,11 +359,11 @@ def xgb_trained_model_reg(context, asset_preprocessed_data):
         'val_mae': evals_result[val_key]['mae'],
     })
     save_data(history_df, f"{ticker}_training_history_xgb_reg.csv", 
-              f"models/{ticker}", context, "xgb_trained_model_reg")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_reg")
 
     # Save feature importance
     save_data(feature_importance_df, f"{ticker}_feature_importance_xgb_reg.csv",
-              f"models/{ticker}", context, "xgb_trained_model_reg")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_reg")
 
     # Save test predictions
     test_results_df = pd.DataFrame({
@@ -373,7 +373,7 @@ def xgb_trained_model_reg(context, asset_preprocessed_data):
         'abs_error': np.abs(y_test_reg - y_test_pred),
     })
     save_data(test_results_df, f"{ticker}_test_predictions_xgb_reg.csv",
-              f"models/{ticker}", context, "xgb_trained_model_reg")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_reg")
 
     output_value = {
         "ticker": ticker,
@@ -453,7 +453,7 @@ def xgb_predictions_reg(context, asset_preprocessed_data, xgb_trained_model_reg)
         'return_percent': [next_return_pred * 100],
     })
     save_data(predictions_df, f"{ticker}_latest_predictions_xgb_reg.csv",
-              f"models/{ticker}", context, "xgb_predictions_reg")
+              f"models/xgb/{ticker}", context, "xgb_predictions_reg")
 
     output_value = {
         "ticker": ticker,
@@ -638,6 +638,7 @@ def xgb_trained_model_cls(context, asset_preprocessed_data):
     # XGBoost 2.x: save_model() doesn't preserve sklearn-specific attributes
     import pickle
     model_path = MODEL_DIR / ticker / f"{ticker}_xgb_model_cls.pkl"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
     context.log.info(f"[XGB CLASSIFICATION] Model saved to {model_path}")
@@ -655,11 +656,11 @@ def xgb_trained_model_cls(context, asset_preprocessed_data):
         'val_error': evals_result[val_key]['error'],
     })
     save_data(history_df, f"{ticker}_training_history_xgb_cls.csv",
-              f"models/{ticker}", context, "xgb_trained_model_cls")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_cls")
 
     # Save feature importance
     save_data(feature_importance_df, f"{ticker}_feature_importance_xgb_cls.csv",
-              f"models/{ticker}", context, "xgb_trained_model_cls")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_cls")
 
     # Save test predictions
     if num_classes == 2:
@@ -678,7 +679,7 @@ def xgb_trained_model_cls(context, asset_preprocessed_data):
             'prob_up': y_test_pred_proba[:, 2],
         })
     save_data(test_results_df, f"{ticker}_test_predictions_xgb_cls.csv",
-              f"models/{ticker}", context, "xgb_trained_model_cls")
+              f"models/xgb/{ticker}", context, "xgb_trained_model_cls")
 
     output_value = {
         "ticker": ticker,
@@ -784,7 +785,7 @@ def xgb_predictions_cls(context, asset_preprocessed_data, xgb_trained_model_cls)
         'prob_up': [prob_up],
     })
     save_data(predictions_df, f"{ticker}_latest_predictions_xgb_cls.csv",
-              f"models/{ticker}", context, "xgb_predictions_cls")
+              f"models/xgb/{ticker}", context, "xgb_predictions_cls")
 
     output_value = {
         "ticker": ticker,

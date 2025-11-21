@@ -1,6 +1,6 @@
 from dagster import Definitions, load_assets_from_modules
 
-from .assets import raw_daily_data, lag_features, indicator_features, targets, preprocessing, lstm_model, xgboost_model
+from .assets import raw_daily_data, lag_features, indicator_features, targets, preprocessing, lstm_model, xgboost_model, ensemble_model
 from .jobs import (
     job_get_data,
     job_lstm_predict_reg,
@@ -9,11 +9,14 @@ from .jobs import (
     job_xgb_predict_reg,
     job_xgb_predict_cls,
     job_xgb_full,
+    job_ensemble_predict_reg,
+    job_ensemble_predict_cls,
+    job_ensemble_full,
     job_compare_models,
 )
 from .schedules import schedule_weekday_0800
 
-all_assets = load_assets_from_modules([raw_daily_data, lag_features, indicator_features, targets, preprocessing, lstm_model, xgboost_model])
+all_assets = load_assets_from_modules([raw_daily_data, lag_features, indicator_features, targets, preprocessing, lstm_model, xgboost_model, ensemble_model])
 
 all_jobs = [
     # Data pipeline
@@ -28,6 +31,11 @@ all_jobs = [
     job_xgb_predict_reg,
     job_xgb_predict_cls,
     job_xgb_full,
+    
+    # Ensemble jobs
+    job_ensemble_predict_reg,
+    job_ensemble_predict_cls,
+    job_ensemble_full,
     
     # Comparison job
     job_compare_models,
