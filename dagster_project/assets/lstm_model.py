@@ -18,7 +18,7 @@ np.random.seed(42)
 tf.random.set_seed(42)
 
 # Configuration
-LOOKBACK = 30  # timesteps for LSTM window
+LOOKBACK = 60  # timesteps for LSTM window
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 CHARTS_DIR = Path("models/charts")
@@ -380,7 +380,7 @@ def build_lstm_model_cls(
 # ============================================================================
 
 training_config_schema_reg = {
-    "lookback": Field(int, default_value=30, description="Number of timesteps for LSTM window"),
+    "lookback": Field(int, default_value=60, description="Number of timesteps for LSTM window"),
     "lstm_units": Field(int, default_value=128, description="Number of units in first LSTM layer"),
     "dense_units": Field(int, default_value=64, description="Number of units in first dense layer"),
     "learning_rate": Field(float, default_value=1e-3, description="Initial learning rate for optimizer"),
@@ -610,24 +610,20 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     return Output(value=output_value, metadata=metadata)
 
 
-prediction_config_schema_reg = {
-    "lookback": Field(int, default_value=30, description="Number of timesteps for LSTM window (must match training)"),
-}
-
-
 @asset(
     name="lstm_predictions_reg",
     group_name="LSTM",
     kinds={"python", "regression"},
-    config_schema=prediction_config_schema_reg,
 )
 def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_reg):
     """
     Use trained LSTM regression model to make predictions on future data.
     Predicts next-day return and converts to price prediction.
+    Uses the same lookback as training to ensure compatibility.
     """
-    # Extract config
-    lookback = context.op_config.get("lookback", LOOKBACK)
+    # Get lookback from trained model to ensure consistency
+    lookback = lstm_trained_model_reg["lookback"]
+    context.log.info(f"[REGRESSION PREDICTION] Using lookback={lookback} from trained model")
 
     # Extract data
     ticker = asset_preprocessed_data["ticker"]
@@ -711,7 +707,7 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
 # ============================================================================
 
 training_config_schema_cls = {
-    "lookback": Field(int, default_value=30, description="Number of timesteps for LSTM window"),
+    "lookback": Field(int, default_value=60, description="Number of timesteps for LSTM window"),
     "lstm_units": Field(int, default_value=64, description="Number of units in first LSTM layer"),
     "dense_units": Field(int, default_value=32, description="Number of units in first dense layer"),
     "learning_rate": Field(float, default_value=5e-3, description="Initial learning rate for optimizer"),
@@ -989,24 +985,20 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     return Output(value=output_value, metadata=metadata)
 
 
-prediction_config_schema_cls = {
-    "lookback": Field(int, default_value=30, description="Number of timesteps for LSTM window (must match training)"),
-}
-
-
 @asset(
     name="lstm_predictions_cls",
     group_name="LSTM",
     kinds={"python", "classification"},
-    config_schema=prediction_config_schema_cls,
 )
 def lstm_predictions_cls(context, asset_preprocessed_data, lstm_trained_model_cls):
     """
     Use trained LSTM classification model to make predictions on future data.
     Predicts next-day direction (down/flat/up) with probabilities.
+    Uses the same lookback as training to ensure compatibility.
     """
-    # Extract config
-    lookback = context.op_config.get("lookback", LOOKBACK)
+    # Get lookback from trained model to ensure consistency
+    lookback = lstm_trained_model_cls["lookback"]
+    context.log.info(f"[CLASSIFICATION PREDICTION] Using lookback={lookback} from trained model")
 
     # Extract data
     ticker = asset_preprocessed_data["ticker"]
