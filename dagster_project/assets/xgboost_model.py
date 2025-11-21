@@ -211,16 +211,16 @@ def plot_roc_curve_chart(y_true, y_pred_proba, ticker: str, save_path: Path):
 # ============================================================================
 
 training_config_schema_reg = {
-    "n_estimators": Field(int, default_value=1000, description="Number of boosting rounds"),
-    "max_depth": Field(int, default_value=6, description="Maximum tree depth"),
-    "learning_rate": Field(float, default_value=0.01, description="Learning rate (eta)"),
-    "subsample": Field(float, default_value=0.8, description="Subsample ratio of training data"),
-    "colsample_bytree": Field(float, default_value=0.8, description="Subsample ratio of columns per tree"),
-    "min_child_weight": Field(int, default_value=3, description="Minimum sum of instance weight in child"),
-    "gamma": Field(float, default_value=0.1, description="Minimum loss reduction for split"),
-    "reg_alpha": Field(float, default_value=0.1, description="L1 regularization"),
-    "reg_lambda": Field(float, default_value=1.0, description="L2 regularization"),
-    "early_stopping_rounds": Field(int, default_value=50, description="Early stopping patience"),
+    "n_estimators": Field(int, default_value=300, description="Number of boosting rounds (reduced to prevent overfitting)"),
+    "max_depth": Field(int, default_value=4, description="Maximum tree depth (reduced to prevent overfitting)"),
+    "learning_rate": Field(float, default_value=0.05, description="Learning rate (eta) (increased for faster convergence)"),
+    "subsample": Field(float, default_value=0.7, description="Subsample ratio of training data (more randomness)"),
+    "colsample_bytree": Field(float, default_value=0.7, description="Subsample ratio of columns per tree (more randomness)"),
+    "min_child_weight": Field(int, default_value=5, description="Minimum sum of instance weight in child (increased regularization)"),
+    "gamma": Field(float, default_value=0.5, description="Minimum loss reduction for split (increased regularization)"),
+    "reg_alpha": Field(float, default_value=0.5, description="L1 regularization (increased)"),
+    "reg_lambda": Field(float, default_value=2.0, description="L2 regularization (increased)"),
+    "early_stopping_rounds": Field(int, default_value=30, description="Early stopping patience (stop sooner)"),
 }
 
 
@@ -481,16 +481,16 @@ def xgb_predictions_reg(context, asset_preprocessed_data, xgb_trained_model_reg)
 # ============================================================================
 
 training_config_schema_cls = {
-    "n_estimators": Field(int, default_value=1000, description="Number of boosting rounds"),
-    "max_depth": Field(int, default_value=5, description="Maximum tree depth"),
-    "learning_rate": Field(float, default_value=0.01, description="Learning rate (eta)"),
-    "subsample": Field(float, default_value=0.8, description="Subsample ratio of training data"),
-    "colsample_bytree": Field(float, default_value=0.8, description="Subsample ratio of columns per tree"),
-    "min_child_weight": Field(int, default_value=3, description="Minimum sum of instance weight in child"),
-    "gamma": Field(float, default_value=0.1, description="Minimum loss reduction for split"),
-    "reg_alpha": Field(float, default_value=0.1, description="L1 regularization"),
-    "reg_lambda": Field(float, default_value=1.0, description="L2 regularization"),
-    "early_stopping_rounds": Field(int, default_value=50, description="Early stopping patience"),
+    "n_estimators": Field(int, default_value=200, description="Number of boosting rounds (reduced to prevent overfitting)"),
+    "max_depth": Field(int, default_value=3, description="Maximum tree depth (reduced to prevent overfitting)"),
+    "learning_rate": Field(float, default_value=0.05, description="Learning rate (eta) (increased for faster convergence)"),
+    "subsample": Field(float, default_value=0.7, description="Subsample ratio of training data (more randomness)"),
+    "colsample_bytree": Field(float, default_value=0.7, description="Subsample ratio of columns per tree (more randomness)"),
+    "min_child_weight": Field(int, default_value=7, description="Minimum sum of instance weight in child (increased regularization)"),
+    "gamma": Field(float, default_value=1.0, description="Minimum loss reduction for split (increased regularization)"),
+    "reg_alpha": Field(float, default_value=1.0, description="L1 regularization (increased)"),
+    "reg_lambda": Field(float, default_value=3.0, description="L2 regularization (increased)"),
+    "early_stopping_rounds": Field(int, default_value=20, description="Early stopping patience (stop sooner)"),
     "scale_pos_weight": Field(float, default_value=1.0, description="Balance of positive vs negative weights"),
 }
 

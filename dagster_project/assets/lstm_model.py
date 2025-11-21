@@ -245,34 +245,31 @@ def build_lstm_model_reg(
     """
     Build enhanced LSTM model for regression.
     
-    NUCLEAR OPTION - Aggressive anti-collapse measures:
-    - GaussianNoise to prevent memorization
+    Architecture:
     - Bidirectional LSTM for capturing patterns in both directions
     - Batch normalization for training stability
     - L2 regularization to prevent overfitting
-    - Anti-collapse loss with variance penalty
     - Configurable dropout to prevent overfitting
     - Progressive dimensionality reduction
     """
-    from tensorflow.keras.layers import Bidirectional, BatchNormalization, GaussianNoise
+    from tensorflow.keras.layers import Bidirectional, BatchNormalization
     from tensorflow.keras.regularizers import l2
     
     model = Sequential()
-    
-    # NUCLEAR: Add noise to inputs to prevent memorization and force generalization
-    model.add(GaussianNoise(0.02, input_shape=(lookback, n_features)))
     
     # First LSTM layer (bidirectional)
     if use_bidirectional:
         model.add(Bidirectional(
             LSTM(lstm_units, return_sequences=True, 
                  kernel_regularizer=l2(l2_reg),
-                 recurrent_regularizer=l2(l2_reg))
+                 recurrent_regularizer=l2(l2_reg),
+                 input_shape=(lookback, n_features))
         ))
     else:
         model.add(LSTM(lstm_units, return_sequences=True, 
                       kernel_regularizer=l2(l2_reg),
-                      recurrent_regularizer=l2(l2_reg)))
+                      recurrent_regularizer=l2(l2_reg),
+                      input_shape=(lookback, n_features)))
     
     model.add(BatchNormalization())
     model.add(Dropout(dropout))  # Use dropout parameter
@@ -318,14 +315,9 @@ def build_lstm_model_reg(
     # Output layer
     model.add(Dense(1, activation='linear'))
     
-    # NUCLEAR: Use anti-collapse loss with variance penalty
-    # This prevents model from predicting constant values
-    if use_directional_loss:
-        loss_fn = anti_collapse_loss
-        context_msg = "NUCLEAR: Anti-collapse loss with variance penalty (forces diverse predictions)"
-    else:
-        loss_fn = tf.keras.losses.Huber(delta=1.0)
-        context_msg = "Standard Huber loss"
+    # Use standard Huber loss for stable training
+    loss_fn = tf.keras.losses.Huber(delta=1.0)
+    context_msg = "Standard Huber loss (robust to outliers)"
     
     model.compile(
         optimizer=tf.keras.optimizers.Adam(
@@ -356,8 +348,7 @@ def build_lstm_model_cls(
     """
     Build enhanced LSTM model for BINARY classification (Up vs Down).
     
-    NUCLEAR OPTION - Aggressive anti-collapse measures:
-    - GaussianNoise to prevent memorization
+    Architecture:
     - Bidirectional LSTM for capturing patterns in both directions
     - Batch normalization for training stability
     - L2 regularization to prevent overfitting
@@ -366,25 +357,24 @@ def build_lstm_model_cls(
     - Configurable dropout to prevent overfitting
     - Simpler, more focused architecture for 2-class problem
     """
-    from tensorflow.keras.layers import Bidirectional, BatchNormalization, GaussianNoise
+    from tensorflow.keras.layers import Bidirectional, BatchNormalization
     from tensorflow.keras.regularizers import l2
     
     model = Sequential()
-    
-    # NUCLEAR: Add noise to inputs to prevent memorization and force generalization
-    model.add(GaussianNoise(0.02, input_shape=(lookback, n_features)))
     
     # First LSTM layer (bidirectional)
     if use_bidirectional:
         model.add(Bidirectional(
             LSTM(lstm_units, return_sequences=True, 
                  kernel_regularizer=l2(l2_reg),
-                 recurrent_regularizer=l2(l2_reg))
+                 recurrent_regularizer=l2(l2_reg),
+                 input_shape=(lookback, n_features))
         ))
     else:
         model.add(LSTM(lstm_units, return_sequences=True, 
                       kernel_regularizer=l2(l2_reg),
-                      recurrent_regularizer=l2(l2_reg)))
+                      recurrent_regularizer=l2(l2_reg),
+                      input_shape=(lookback, n_features)))
     
     model.add(BatchNormalization())
     model.add(Dropout(dropout))  # Use dropout parameter
@@ -456,16 +446,16 @@ def build_lstm_model_cls(
 # ============================================================================
 
 training_config_schema_reg = {
-    "lookback": Field(int, default_value=90, description="Number of timesteps for LSTM window (increased for better context)"),
-    "lstm_units": Field(int, default_value=64, description="Number of units in first LSTM layer (reduced to prevent overfitting)"),
-    "dense_units": Field(int, default_value=32, description="Number of units in first dense layer (reduced to prevent overfitting)"),
-    "dropout": Field(float, default_value=0.3, description="Dropout rate after LSTM layers (prevents overfitting)"),
-    "learning_rate": Field(float, default_value=0.01, description="NUCLEAR: High learning rate to force exploration (10x normal)"),
+    "lookback": Field(int, default_value=60, description="Number of timesteps for LSTM window"),
+    "lstm_units": Field(int, default_value=128, description="Number of units in first LSTM layer (increased capacity)"),
+    "dense_units": Field(int, default_value=64, description="Number of units in first dense layer (increased capacity)"),
+    "dropout": Field(float, default_value=0.2, description="Dropout rate after LSTM layers (reduced to allow learning)"),
+    "learning_rate": Field(float, default_value=0.0005, description="Learning rate (reduced 20x to prevent gradient explosion)"),
     "epochs": Field(int, default_value=200, description="Maximum number of training epochs"),
     "batch_size": Field(int, default_value=32, description="Batch size for training"),
-    "patience": Field(int, default_value=999, description="NUCLEAR: Disabled early stopping - train full epochs"),
+    "patience": Field(int, default_value=120, description="Early stopping patience (re-enabled)"),
     "use_bidirectional": Field(bool, default_value=True, description="Use bidirectional LSTM layers"),
-    "l2_reg": Field(float, default_value=1e-4, description="L2 regularization factor"),
+    "l2_reg": Field(float, default_value=1e-5, description="L2 regularization factor (reduced)"),
 }
 
 
@@ -715,13 +705,12 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
     last_close = asset_preprocessed_data["last_close"]
     last_date = asset_preprocessed_data["last_date"]
 
-    # Load model with custom loss function
+    # Load model
     model_path = lstm_trained_model_reg["model_path"]
     context.log.info(f"[REGRESSION] Loading model from {model_path}")
     
-    # Need to pass custom loss function when loading (must match training params)
-    custom_objects = {'loss': anti_collapse_loss}
-    model = tf.keras.models.load_model(model_path, custom_objects=custom_objects)
+    # Load model (using standard Huber loss, no custom objects needed)
+    model = tf.keras.models.load_model(model_path)
 
     # Build continuous feature matrix to extract last lookback rows
     X_all = pd.concat([X_train, X_val, X_test, X_predict], axis=0)
@@ -791,16 +780,16 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
 # ============================================================================
 
 training_config_schema_cls = {
-    "lookback": Field(int, default_value=90, description="Number of timesteps for LSTM window (increased for better context)"),
-    "lstm_units": Field(int, default_value=48, description="Number of units in first LSTM layer (reduced to prevent overfitting)"),
-    "dense_units": Field(int, default_value=24, description="Number of units in first dense layer (reduced to prevent overfitting)"),
-    "dropout": Field(float, default_value=0.3, description="Dropout rate after LSTM layers (prevents overfitting)"),
-    "learning_rate": Field(float, default_value=0.01, description="NUCLEAR: High learning rate to force exploration (2x normal)"),
+    "lookback": Field(int, default_value=60, description="Number of timesteps for LSTM window"),
+    "lstm_units": Field(int, default_value=96, description="Number of units in first LSTM layer (increased capacity)"),
+    "dense_units": Field(int, default_value=48, description="Number of units in first dense layer (increased capacity)"),
+    "dropout": Field(float, default_value=0.2, description="Dropout rate after LSTM layers (reduced to allow learning)"),
+    "learning_rate": Field(float, default_value=0.001, description="Learning rate (reduced 10x to prevent gradient explosion)"),
     "epochs": Field(int, default_value=200, description="Maximum number of training epochs"),
     "batch_size": Field(int, default_value=16, description="Batch size for training"),
-    "patience": Field(int, default_value=999, description="NUCLEAR: Disabled early stopping - train full epochs"),
-    "use_bidirectional": Field(bool, default_value=False, description="Use bidirectional LSTM layers"),
-    "l2_reg": Field(float, default_value=5e-5, description="L2 regularization factor"),
+    "patience": Field(int, default_value=180, description="Early stopping patience (re-enabled)"),
+    "use_bidirectional": Field(bool, default_value=True, description="Use bidirectional LSTM layers (enabled for better context)"),
+    "l2_reg": Field(float, default_value=1e-5, description="L2 regularization factor (reduced)"),
 }
 
 
