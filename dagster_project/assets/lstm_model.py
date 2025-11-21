@@ -156,19 +156,28 @@ def plot_scatter_comparison(y_true, y_pred, ticker: str, model_type: str, save_p
     return str(save_path)
 
 
-def plot_confusion_matrix_chart(cm, ticker: str, save_path: Path):
+def plot_confusion_matrix_chart(cm, ticker: str, save_path: Path, num_classes: int = 2):
     """
     Plot confusion matrix for classification.
+    Automatically adjusts labels based on number of classes (2 or 3).
     """
     import seaborn as sns
     
     # Ensure parent directory exists
     save_path.parent.mkdir(parents=True, exist_ok=True)
     
-    plt.figure(figsize=(8, 6))
+    # Set labels based on number of classes
+    if num_classes == 2:
+        labels = ['Down', 'Up']
+        figsize = (6, 5)
+    else:
+        labels = ['Down', 'Flat', 'Up']
+        figsize = (8, 6)
+    
+    plt.figure(figsize=figsize)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=['Down', 'Flat', 'Up'],
-                yticklabels=['Down', 'Flat', 'Up'],
+                xticklabels=labels,
+                yticklabels=labels,
                 cbar_kws={'label': 'Count'})
     plt.xlabel("Predicted", fontsize=12)
     plt.ylabel("True", fontsize=12)
@@ -180,6 +189,32 @@ def plot_confusion_matrix_chart(cm, ticker: str, save_path: Path):
     return str(save_path)
 
 
+def directional_huber_loss(delta=1.0, direction_weight=0.3):
+    """
+    Custom loss that combines Huber loss with directional accuracy.
+    This prevents mode collapse by penalizing wrong direction predictions.
+    
+    Args:
+        delta: Huber loss threshold
+        direction_weight: Weight for directional component (0-1)
+    """
+    def loss(y_true, y_pred):
+        # Standard Huber loss for magnitude
+        huber = tf.keras.losses.Huber(delta=delta)(y_true, y_pred)
+        
+        # Directional penalty: penalize when signs don't match
+        # sign(true) * sign(pred) = 1 if same sign, -1 if opposite
+        direction_agreement = tf.sign(y_true) * tf.sign(y_pred)
+        # Convert to loss: 0 if same sign, 1 if opposite sign
+        direction_loss = (1.0 - direction_agreement) / 2.0
+        
+        # Combine losses
+        total_loss = (1.0 - direction_weight) * huber + direction_weight * direction_loss
+        return total_loss
+    
+    return loss
+
+
 def build_lstm_model_reg(
     lookback: int,
     n_features: int,
@@ -188,6 +223,7 @@ def build_lstm_model_reg(
     learning_rate: float = 1e-3,
     use_bidirectional: bool = True,
     l2_reg: float = 1e-4,
+    use_directional_loss: bool = True,
 ):
     """
     Build enhanced LSTM model for regression.
@@ -196,6 +232,7 @@ def build_lstm_model_reg(
     - Bidirectional LSTM for capturing patterns in both directions
     - Batch normalization for training stability
     - L2 regularization to prevent overfitting
+    - Directional Huber loss to prevent mode collapse (predicting all zeros)
     - Larger capacity with more units
     - Progressive dimensionality reduction
     """
@@ -262,13 +299,21 @@ def build_lstm_model_reg(
     # Output layer
     model.add(Dense(1, activation='linear'))
     
-    # Use Huber loss which is more robust to outliers than MSE
+    # Use directional Huber loss to prevent mode collapse
+    # This penalizes wrong direction predictions, not just magnitude errors
+    if use_directional_loss:
+        loss_fn = directional_huber_loss(delta=0.05, direction_weight=0.4)
+        context_msg = "Directional Huber loss (prevents mode collapse)"
+    else:
+        loss_fn = tf.keras.losses.Huber(delta=1.0)
+        context_msg = "Standard Huber loss"
+    
     model.compile(
         optimizer=tf.keras.optimizers.Adam(
             learning_rate=learning_rate,
             clipnorm=1.0  # Gradient clipping to prevent exploding gradients
         ),
-        loss=tf.keras.losses.Huber(delta=1.0),  # More robust than MSE
+        loss=loss_fn,
         metrics=[
             "mae",
             tf.keras.metrics.RootMeanSquaredError(name="rmse"),
@@ -281,7 +326,7 @@ def build_lstm_model_reg(
 def build_lstm_model_cls(
     lookback: int,
     n_features: int,
-    num_classes: int = 3,
+    num_classes: int = 2,  # Changed from 3 to 2 for binary classification
     lstm_units: int = 128,
     dense_units: int = 64,
     learning_rate: float = 1e-3,
@@ -289,14 +334,15 @@ def build_lstm_model_cls(
     l2_reg: float = 1e-4,
 ):
     """
-    Build enhanced LSTM model for classification.
+    Build enhanced LSTM model for BINARY classification (Up vs Down).
     
     Improvements:
     - Bidirectional LSTM for capturing patterns in both directions
     - Batch normalization for training stability
     - L2 regularization to prevent overfitting
     - Class weights support for imbalanced data
-    - Softmax output for multi-class classification
+    - Binary crossentropy for binary classification
+    - Simpler, more focused architecture for 2-class problem
     """
     from tensorflow.keras.layers import Bidirectional, BatchNormalization
     from tensorflow.keras.regularizers import l2
@@ -358,16 +404,23 @@ def build_lstm_model_cls(
     model.add(Dense(dense_units // 2, activation='relu', kernel_regularizer=l2(l2_reg)))
     model.add(Dropout(0.1))
     
-    # Output layer - softmax for multi-class classification
-    model.add(Dense(num_classes, activation='softmax'))
+    # Output layer for binary classification
+    if num_classes == 2:
+        # Binary classification: single output with sigmoid
+        model.add(Dense(1, activation='sigmoid'))
+        loss_fn = 'binary_crossentropy'
+    else:
+        # Multi-class classification: multiple outputs with softmax
+        model.add(Dense(num_classes, activation='softmax'))
+        loss_fn = 'sparse_categorical_crossentropy'
     
-    # Use categorical crossentropy for multi-class classification
+    # Compile model
     model.compile(
         optimizer=tf.keras.optimizers.Adam(
             learning_rate=learning_rate,
             clipnorm=1.0  # Gradient clipping
         ),
-        loss='sparse_categorical_crossentropy',  # Use sparse for integer labels
+        loss=loss_fn,
         metrics=[
             'accuracy',
         ],
@@ -439,6 +492,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     n_features = X_train_seq.shape[-1]
     context.log.info(f"[REGRESSION] Building enhanced LSTM model with {n_features} features")
     context.log.info(f"[REGRESSION] Using bidirectional: {use_bidirectional}, L2 reg: {l2_reg}")
+    context.log.info(f"[REGRESSION] Using directional loss to prevent mode collapse")
     
     model = build_lstm_model_reg(
         lookback=lookback,
@@ -448,6 +502,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
         learning_rate=learning_rate,
         use_bidirectional=use_bidirectional,
         l2_reg=l2_reg,
+        use_directional_loss=True,  # Prevents model from predicting all zeros
     )
 
     context.log.info("[REGRESSION] Model architecture:")
@@ -634,10 +689,13 @@ def lstm_predictions_reg(context, asset_preprocessed_data, lstm_trained_model_re
     last_close = asset_preprocessed_data["last_close"]
     last_date = asset_preprocessed_data["last_date"]
 
-    # Load model
+    # Load model with custom loss function
     model_path = lstm_trained_model_reg["model_path"]
     context.log.info(f"[REGRESSION] Loading model from {model_path}")
-    model = tf.keras.models.load_model(model_path)
+    
+    # Need to pass custom loss function when loading
+    custom_objects = {'loss': directional_huber_loss(delta=0.05, direction_weight=0.4)}
+    model = tf.keras.models.load_model(model_path, custom_objects=custom_objects)
 
     # Build continuous feature matrix to extract last lookback rows
     X_all = pd.concat([X_train, X_val, X_test, X_predict], axis=0)
@@ -758,14 +816,15 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     X_val_seq, y_val_seq = make_sequences(X_val, y_val_cls, lookback)
     X_test_seq, y_test_seq = make_sequences(X_test, y_test_cls, lookback)
 
-    # Convert labels to 0-indexed for sparse_categorical_crossentropy
-    # Original: -1 (down), 0 (flat), 1 (up) → New: 0 (down), 1 (flat), 2 (up)
-    y_train_seq = (y_train_seq + 1).astype(int)
-    y_val_seq = (y_val_seq + 1).astype(int)
-    y_test_seq = (y_test_seq + 1).astype(int)
+    # Labels are already 0 (Down) and 1 (Up) from binary classification in targets.py
+    # No conversion needed!
+    y_train_seq = y_train_seq.astype(int)
+    y_val_seq = y_val_seq.astype(int)
+    y_test_seq = y_test_seq.astype(int)
     
     num_classes = len(np.unique(y_train_seq))
-    context.log.info(f"[CLASSIFICATION] Number of classes: {num_classes}")
+    context.log.info(f"[CLASSIFICATION] Number of classes: {num_classes} (Binary: 0=Down, 1=Up)")
+    context.log.info(f"[CLASSIFICATION] Unique labels in train: {np.unique(y_train_seq)}")
 
     context.log.info(f"[CLASSIFICATION] Sequence shapes:")
     context.log.info(f"  X_train_seq: {X_train_seq.shape}, y_train_seq: {y_train_seq.shape}")
@@ -849,7 +908,22 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     
     # Get predictions for test set
     y_test_pred_proba = model.predict(X_test_seq, verbose=0)
-    y_test_pred = np.argmax(y_test_pred_proba, axis=1)
+    
+    # Handle binary vs multi-class predictions
+    if num_classes == 2:
+        # Binary classification with sigmoid output (shape: (n, 1) or (n,))
+        if len(y_test_pred_proba.shape) == 2 and y_test_pred_proba.shape[1] == 1:
+            # Sigmoid output: (n, 1) -> flatten and threshold
+            y_test_pred = (y_test_pred_proba.flatten() > 0.5).astype(int)
+        else:
+            # Already flat or 2-class softmax
+            if len(y_test_pred_proba.shape) == 1:
+                y_test_pred = (y_test_pred_proba > 0.5).astype(int)
+            else:
+                y_test_pred = np.argmax(y_test_pred_proba, axis=1)
+    else:
+        # Multi-class classification with softmax
+        y_test_pred = np.argmax(y_test_pred_proba, axis=1)
 
     # Calculate detailed metrics using scikit-learn
     from sklearn.metrics import precision_score, recall_score, f1_score, classification_report, confusion_matrix
@@ -866,8 +940,14 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     
     # Log classification report
     context.log.info("[CLASSIFICATION] Classification Report:")
+    # Use correct target names based on number of classes
+    if num_classes == 2:
+        target_names = ['Down', 'Up']
+    else:
+        target_names = ['Down', 'Flat', 'Up']
+    
     report = classification_report(y_test_seq, y_test_pred, 
-                                   target_names=['Down', 'Flat', 'Up'],
+                                   target_names=target_names,
                                    zero_division=0)
     context.log.info(f"\n{report}")
     
@@ -886,7 +966,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     
     context.log.info("[CLASSIFICATION] Generating confusion matrix plot...")
     cm_plot_path = CHARTS_DIR / ticker / f"{ticker}_confusion_matrix_cls.png"
-    plot_confusion_matrix_chart(cm, ticker, cm_plot_path)
+    plot_confusion_matrix_chart(cm, ticker, cm_plot_path, num_classes=num_classes)
 
     # Save model
     model_path = MODEL_DIR / ticker / f"{ticker}_lstm_model_cls.keras"
@@ -921,14 +1001,33 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
         asset="lstm_trained_model_cls"
     )
 
-    # Save test predictions
-    test_results_df = pd.DataFrame({
-        'y_true': y_test_seq,
-        'y_pred': y_test_pred,
-        'prob_down': y_test_pred_proba[:, 0],
-        'prob_flat': y_test_pred_proba[:, 1],
-        'prob_up': y_test_pred_proba[:, 2],
-    })
+    # Save test predictions with proper probability extraction
+    if num_classes == 2:
+        # Binary classification: extract probabilities correctly
+        if len(y_test_pred_proba.shape) == 2 and y_test_pred_proba.shape[1] == 1:
+            # Sigmoid output: (n, 1) - single probability for class 1 (Up)
+            prob_up = y_test_pred_proba.flatten()
+            prob_down = 1.0 - prob_up
+        else:
+            # Softmax with 2 classes: (n, 2)
+            prob_down = y_test_pred_proba[:, 0]
+            prob_up = y_test_pred_proba[:, 1]
+        
+        test_results_df = pd.DataFrame({
+            'y_true': y_test_seq,
+            'y_pred': y_test_pred,
+            'prob_down': prob_down,
+            'prob_up': prob_up,
+        })
+    else:
+        # Multi-class classification: 3 classes
+        test_results_df = pd.DataFrame({
+            'y_true': y_test_seq,
+            'y_pred': y_test_pred,
+            'prob_down': y_test_pred_proba[:, 0],
+            'prob_flat': y_test_pred_proba[:, 1],
+            'prob_up': y_test_pred_proba[:, 2],
+        })
     save_data(
         df=test_results_df,
         filename=f"{ticker}_test_predictions_cls.csv",
@@ -1027,25 +1126,66 @@ def lstm_predictions_cls(context, asset_preprocessed_data, lstm_trained_model_cl
     n_features = latest_window.shape[1]
     latest_window = latest_window.reshape(1, lookback, n_features)
 
-    # Predict probabilities for each class
-    pred_proba = model.predict(latest_window, verbose=0)[0]
-    pred_class = int(np.argmax(pred_proba))
+    # Predict probabilities
+    pred_output = model.predict(latest_window, verbose=0)[0]
     
-    # Convert back to original labels: 0→-1 (down), 1→0 (flat), 2→1 (up)
-    pred_label = pred_class - 1
+    # Handle binary vs multi-class classification
+    # Initialize prob_flat to 0.0 (will be overridden if ternary classification)
+    prob_flat = 0.0
     
-    # Map to direction names
-    direction_map = {-1: 'Down', 0: 'Flat', 1: 'Up'}
-    pred_direction = direction_map[pred_label]
-    
-    prob_down = float(pred_proba[0])
-    prob_flat = float(pred_proba[1])
-    prob_up = float(pred_proba[2])
-    confidence = float(np.max(pred_proba))
-    
-    context.log.info(f"[CLASSIFICATION] Predicted direction: {pred_direction}")
-    context.log.info(f"[CLASSIFICATION] Confidence: {confidence:.2%}")
-    context.log.info(f"[CLASSIFICATION] Probabilities - Down: {prob_down:.2%}, Flat: {prob_flat:.2%}, Up: {prob_up:.2%}")
+    if len(pred_output.shape) == 0 or pred_output.shape == ():
+        # Binary classification with sigmoid (single output)
+        prob_up = float(pred_output)
+        prob_down = 1.0 - prob_up
+        
+        pred_class = 1 if prob_up > 0.5 else 0
+        pred_label = pred_class  # 0=Down, 1=Up
+        pred_direction = 'Up' if pred_class == 1 else 'Down'
+        confidence = max(prob_up, prob_down)
+        
+        context.log.info(f"[CLASSIFICATION - BINARY] Predicted direction: {pred_direction}")
+        context.log.info(f"[CLASSIFICATION - BINARY] Confidence: {confidence:.2%}")
+        context.log.info(f"[CLASSIFICATION - BINARY] Probabilities - Down: {prob_down:.2%}, Up: {prob_up:.2%}")
+    else:
+        # Multi-class classification with softmax OR binary sigmoid with shape (1,)
+        pred_proba = pred_output
+        
+        if len(pred_proba) == 1:
+            # Binary sigmoid output with shape (1,) instead of scalar
+            prob_up = float(pred_proba[0])
+            prob_down = 1.0 - prob_up
+            pred_class = 1 if prob_up > 0.5 else 0
+            pred_label = pred_class  # 0=Down, 1=Up
+            pred_direction = 'Up' if pred_class == 1 else 'Down'
+            confidence = max(prob_up, prob_down)
+            context.log.info(f"[CLASSIFICATION - BINARY] Predicted direction: {pred_direction}")
+            context.log.info(f"[CLASSIFICATION - BINARY] Confidence: {confidence:.2%}")
+            context.log.info(f"[CLASSIFICATION - BINARY] Probabilities - Down: {prob_down:.2%}, Up: {prob_up:.2%}")
+        elif len(pred_proba) == 2:
+            # Binary encoded as 2-class softmax
+            pred_class = int(np.argmax(pred_proba))
+            prob_down = float(pred_proba[0])
+            prob_up = float(pred_proba[1])
+            # prob_flat already initialized to 0.0 above
+            pred_label = pred_class  # 0=Down, 1=Up
+            pred_direction = 'Up' if pred_class == 1 else 'Down'
+            confidence = float(np.max(pred_proba))
+            context.log.info(f"[CLASSIFICATION - BINARY SOFTMAX] Predicted direction: {pred_direction}")
+            context.log.info(f"[CLASSIFICATION - BINARY SOFTMAX] Confidence: {confidence:.2%}")
+            context.log.info(f"[CLASSIFICATION - BINARY SOFTMAX] Probabilities - Down: {prob_down:.2%}, Up: {prob_up:.2%}")
+        else:
+            # Ternary (3-class): 0=Down, 1=Flat, 2=Up
+            pred_class = int(np.argmax(pred_proba))
+            prob_down = float(pred_proba[0])
+            prob_flat = float(pred_proba[1])
+            prob_up = float(pred_proba[2])
+            pred_label = pred_class - 1  # Convert 0,1,2 → -1,0,1
+            direction_map = {-1: 'Down', 0: 'Flat', 1: 'Up'}
+            pred_direction = direction_map[pred_label]
+            confidence = float(np.max(pred_proba))
+            context.log.info(f"[CLASSIFICATION - TERNARY] Predicted direction: {pred_direction}")
+            context.log.info(f"[CLASSIFICATION - TERNARY] Confidence: {confidence:.2%}")
+            context.log.info(f"[CLASSIFICATION - TERNARY] Probabilities - Down: {prob_down:.2%}, Flat: {prob_flat:.2%}, Up: {prob_up:.2%}")
 
     # Save predictions
     predictions_df = pd.DataFrame({

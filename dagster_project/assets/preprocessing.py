@@ -26,28 +26,73 @@ def asset_preprocessed_data(context, target_updown):
     df["month_sin"] = np.sin(2 * np.pi * (df["date"].dt.month - 1) / 12)
     df["month_cos"] = np.cos(2 * np.pi * (df["date"].dt.month - 1) / 12)
 
-    #targets + features
-    target_cls = "y_updown_1d"
-    target_reg = "y_price_return_1d"
+    #targets + features (updated to 3-day prediction)
+    target_cls = "y_updown_3d"  # Changed from 1d to 3d
+    target_reg = "y_price_return_3d"  # Changed from 1d to 3d
     features = [c for c in df.columns if c not in (target_cls, target_reg, "date", "close")] # use adj_close instead of close
+    
+    context.log.info(f"Using targets: regression='{target_reg}', classification='{target_cls}'")
 
-    bounded_01 = ["RSI_14", "Stoch_k", "Stoch_d", "MFI_14"]
+    # Features bounded to [0, 1] or [0, 100] range
+    bounded_01 = [
+        "RSI_14", "Stoch_k", "Stoch_d", "MFI_14",
+        "BB_position", "KC_position", 
+        "price_position_5d", "price_position_10d", "price_position_20d",
+    ]
 
-    heavy_pos = ["volume", "Volume_SMA_20", "ATR_14", "BB_width", "High_Low_Spread"]
+    # Features that are always positive and potentially very large (need log transform)
+    heavy_pos = [
+        "volume", "Volume_SMA_20", "ATR_14", "BB_width", "High_Low_Spread",
+        "volume_mean_5d", "volume_mean_10d", "volume_mean_20d",
+        "volume_std_5d", "volume_std_10d", "volume_std_20d",
+        "KC_width", "close_std_5d", "close_std_10d", "close_std_20d",
+    ]
+    # Also add volume lags
+    for lag in [1, 2, 3, 5, 7, 10]:
+        heavy_pos.append(f"volume_lag{lag}")
 
+    # Features that can be very large and signed (need signed log transform)
     heavy_signed_obv = ["OBV"]
 
+    # Features centered around zero (returns, momentum indicators, relative measures)
     zero_center_std = [
-        "daily_return", "daily_return_lag1", "daily_return_lag2", "daily_return_lag3",
-        "MACD", "MACD_signal", "MACD_diff",
-        "ROC_10", "Close_to_EMA20",
+        "daily_return", "return_2d", "return_3d", "return_5d", "return_10d", "return_20d",
+        "return_mean_5d", "return_mean_10d", "return_mean_20d",
+        "return_std_5d", "return_std_10d", "return_std_20d",
+        "MACD", "MACD_signal", "MACD_diff", "MACD_acceleration", "MACD_to_signal_ratio",
+        "ROC_10", "ROC_to_ATR",
+        "Close_to_EMA20", "Close_to_EMA50", "EMA20_to_EMA50",
+        "pct_from_high_5d", "pct_from_high_10d", "pct_from_high_20d",
+        "pct_from_low_5d", "pct_from_low_10d", "pct_from_low_20d",
+        "volume_change", "volume_change_5d",
+        "volume_ratio_5d", "volume_ratio_10d", "volume_ratio_20d",
+        "hl_pct_5d", "hl_pct_10d", "hl_pct_20d",
+        "realized_vol_10d", "realized_vol_20d",
+        "BB_width_pct", "volume_price_trend",
+        "RSI_change", "RSI_slope_5d",
+        "Stoch_K_D_diff", "Stoch_change",
+        "efficiency_ratio_10d",
+        "ADX_14", "ADX_pos", "ADX_neg", "CCI_20", "WillR_14", "UO", "CMF_20",
     ]
+    # Add return lags
+    for lag in [1, 2, 3, 5, 7, 10]:
+        zero_center_std.append(f"daily_return_lag{lag}")
 
+    # Price-like features (absolute levels)
     price_like_std = [
         "open", "high", "low", "close", "adj_close",
-        "adj_close_lag1", "adj_close_lag2", "adj_close_lag3",
         "EMA_20", "EMA_50", "BB_high", "BB_low", "BB_mid",
+        "KC_high", "KC_low", "KC_mid",
+        "DC_high", "DC_low", "DC_mid",
+        "close_mean_5d", "close_mean_10d", "close_mean_20d",
+        "close_min_5d", "close_min_10d", "close_min_20d",
+        "close_max_5d", "close_max_10d", "close_max_20d",
     ]
+    # Add price lags
+    for lag in [1, 2, 3, 5, 7, 10]:
+        price_like_std.append(f"adj_close_lag{lag}")
+        price_like_std.append(f"high_lag{lag}")
+        price_like_std.append(f"low_lag{lag}")
 
     def signed_log1p(x: pd.Series) -> pd.Series:
         return np.sign(x) * np.log1p(np.abs(x))
@@ -65,6 +110,21 @@ def asset_preprocessed_data(context, target_updown):
 
     y_cls = df[target_cls].copy()[:-1]
     y_reg = df[target_reg].copy()[:-1]
+    
+    # Drop samples with NaN in classification target (binary mode drops "flat" samples)
+    valid_cls_mask = y_cls.notna()
+    valid_reg_mask = y_reg.notna()
+    
+    # Use samples that are valid for BOTH tasks
+    valid_mask = valid_cls_mask & valid_reg_mask
+    
+    n_dropped = (~valid_mask).sum()
+    n_total = len(X)
+    context.log.info(f"Dropping {n_dropped}/{n_total} samples ({100*n_dropped/n_total:.1f}%) with NaN targets")
+    
+    X = X[valid_mask].reset_index(drop=True)
+    y_cls = y_cls[valid_mask].reset_index(drop=True)
+    y_reg = y_reg[valid_mask].reset_index(drop=True)
 
     last_close = float(df["close"].iloc[-1])   # yesterday's close, for price prediction
     last_date = df["date"].iloc[-1]
