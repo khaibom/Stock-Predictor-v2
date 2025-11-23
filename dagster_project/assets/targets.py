@@ -4,7 +4,7 @@ from .methods.save_data import save_data
 from .methods.logging import log_df
 
 reg_config_schema = {
-    "days_ahead": Field(int, default_value=1, description="Prediction horizon in TRADING days (weekends excluded automatically)"),
+    "days_ahead": Field(int, default_value=1, description="Prediction horizon in bars/periods (interval-aware)"),
     "mode": Field(str, default_value="return", description="Target type: 'return' or 'level'"),
 }
 @asset(
@@ -16,17 +16,22 @@ reg_config_schema = {
 def target_price(context, asset_features_full):
     """
     Creates a numeric target:
-    - mode='return': y = future_return over N TRADING days (weekends auto-skipped by pandas)
-    - mode='level' : y = future_close over N TRADING days
+    - mode='return': y = future_return over N periods (interval-aware)
+    - mode='level' : y = future_close over N periods
     
-    NOTE: Since data only contains trading days (no weekends), shift(-n) automatically
-    shifts by n TRADING days, not calendar days.
+    NOTE: Since data only contains actual trading periods (no gaps for markets closed),
+    shift(-n) automatically shifts by n bars, which correspond to:
+    - For daily ('1d'): n trading days
+    - For hourly ('1h'): n trading hours
+    - For minute intervals: n minute bars
     """
-    df, ticker = asset_features_full
+    df, ticker, interval = asset_features_full
     n = context.op_config["days_ahead"]
     mode = context.op_config["mode"].lower()
+    
+    context.log.info(f"Creating target for {interval} interval, {n} periods ahead")
 
-    # shift(-n) on trading-day-only data = n trading days ahead
+    # shift(-n) on trading-period-only data = n periods ahead
     future_close = df["close"].shift(-n)
 
     if mode == "level":
@@ -38,21 +43,22 @@ def target_price(context, asset_features_full):
 
     log_df(df, context, 'target_price')
     save_data(df=df,
-              filename=f"{ticker}_target_price.csv",
+              filename=f"{ticker}_{interval}_target_price.csv",
               dir=f"data/processed/{ticker}",
               context=context,
               asset="target_price"
               )
-    return Output((df, ticker, n),  # Return days_ahead for dynamic column name construction
+    return Output((df, ticker, interval, n),  # Return interval and days_ahead for dynamic column name construction
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
                             "days_ahead": n,
+                            "interval": interval,
                             })
 
 
 
 clf_config_schema = {
-    "days_ahead": Field(int, default_value=1, description="Prediction horizon in TRADING days (weekends excluded)"),
+    "days_ahead": Field(int, default_value=1, description="Prediction horizon in bars/periods (interval-aware)"),
     "threshold": Field(float, default_value=0.01, description="Threshold for binary classification (e.g., 0.01 = 1.0%). Movements < threshold are DROPPED."),
     "mode": Field(str, default_value="binary", description="'binary' (Up/Down only) or 'ternary' (Up/Down/Flat)"),
 }
@@ -71,9 +77,9 @@ def target_updown(context, target_price):
     
     This creates cleaner, more learnable labels by removing ambiguous "flat" movements.
     
-    NOTE: Uses n TRADING days ahead (weekends auto-skipped).
+    NOTE: Uses n periods ahead (interval-aware).
     """
-    df, ticker, n_from_price = target_price  # Get days_ahead from target_price
+    df, ticker, interval, n_from_price = target_price  # Get interval and days_ahead from target_price
     n = context.op_config["days_ahead"]
     
     # Verify consistency between regression and classification configs
@@ -81,8 +87,10 @@ def target_updown(context, target_price):
         context.log.warning(f"Classification days_ahead ({n}) != Regression days_ahead ({n_from_price}). Using classification config ({n}).")
     thr = context.op_config["threshold"]
     mode = context.op_config["mode"]
+    
+    context.log.info(f"Creating classification target for {interval} interval, {n} periods ahead")
 
-    # Calculate future return over n trading days
+    # Calculate future return over n periods
     future_ret = (df["close"].shift(-n) / df["close"]) - 1.0
 
     if mode == "binary":
@@ -117,7 +125,7 @@ def target_updown(context, target_price):
     valid_samples = df[target_col].notna().sum()
     dropped_samples = total_before - valid_samples
     
-    context.log.info(f"Target distribution ({n}-day ahead):")
+    context.log.info(f"Target distribution ({n}-period ahead, interval={interval}):")
     context.log.info(f"  Total samples: {total_before}")
     context.log.info(f"  Valid samples: {valid_samples}")
     context.log.info(f"  Dropped samples: {dropped_samples} ({100*dropped_samples/total_before:.1f}%)")
@@ -132,14 +140,15 @@ def target_updown(context, target_price):
 
     log_df(df, context, 'target_updown')
     save_data(df=df,
-              filename=f"{ticker}_target_updown.csv",
+              filename=f"{ticker}_{interval}_target_updown.csv",
               dir=f"data/processed/{ticker}",
               context=context,
               asset="target_updown"
               )
-    return Output((df, ticker, n),  # Return days_ahead for dynamic column name construction
+    return Output((df, ticker, interval, n),  # Return interval and days_ahead for dynamic column name construction
            metadata={"num_rows": df.shape[0],
                      "num_columns": df.shape[1],
                      "ticker": ticker,
+                     "interval": interval,
                      "days_ahead": n,
                      })

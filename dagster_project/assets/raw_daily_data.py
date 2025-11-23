@@ -13,6 +13,7 @@ config_schema = Shape({
     'start_date': Field(str, default_value=str(start), description='Start date in "YYYY-MM-DD"'),
     'end_date': Field(str, default_value=str(end), description='End date in "YYYY-MM-DD"'),
     'ticker': Field(str, default_value='NVD.DE', description='Yahoo Finance ticker symbol'),
+    'interval': Field(str, default_value='1d', description='Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo'),
 })
 
 @asset(
@@ -26,9 +27,17 @@ def asset_market_raw(context):
     start_date = config.get("start_date", str(start))
     end_date = config.get("end_date", str(end))
     ticker = config.get("ticker")
+    interval = config.get("interval", "1d")
 
-    def download_daily_data(tk=ticker, sd=start_date, ed=end_date):
-        df = yf.download(tickers=tk, start=sd, end=ed, interval="1d", auto_adjust=False)
+    def download_daily_data(tk=ticker, sd=start_date, ed=end_date, intv=interval):
+        # Check for yfinance API limits
+        if intv in ['1m', '2m', '5m', '15m', '30m']:
+            context.log.warning(f"Note: yfinance limits minute-level data to last 60 days")
+        elif intv in ['1h', '60m', '90m']:
+            context.log.warning(f"Note: yfinance limits hourly data to approximately last 730 days (~2 years)")
+            context.log.warning(f"   Requested: {sd} to {ed}")
+            
+        df = yf.download(tickers=tk, start=sd, end=ed, interval=intv, auto_adjust=False)
 
         # Flatten column names if grouped by ticker
         if isinstance(df.columns, pd.MultiIndex):
@@ -36,8 +45,11 @@ def asset_market_raw(context):
 
         df = df.reset_index()
         # Standardize column names to lowercase / snake_case
+        # yfinance returns "Date" for daily data and "Datetime" for intraday data
+        # We normalize both to "datetime" for consistency and accuracy
         rename_map = {
-            "Date": "date",
+            "Date": "datetime",      # Daily data (time will be 00:00:00)
+            "Datetime": "datetime",  # Intraday data (preserves time information)
             "Open": "open",
             "High": "high",
             "Low": "low",
@@ -46,13 +58,19 @@ def asset_market_raw(context):
             "Volume": "volume",
         }
         df = df.rename(columns=rename_map)
-        df = df[["date", "open", "high", "low", "close", "adj_close", "volume"]]
+        
+        # Ensure we have a 'datetime' column (could be from Date or Datetime)
+        if 'datetime' not in df.columns:
+            context.log.error(f"No date/datetime column found. Available columns: {df.columns.tolist()}")
+            raise ValueError("Expected 'Date' or 'Datetime' column from yfinance data")
+        
+        df = df[["datetime", "open", "high", "low", "close", "adj_close", "volume"]]
         return df
 
     def clean_data(df):
         context.log.info(f"Initial columns: {df.columns.tolist()}")
 
-        numeric_cols = ["date", "open", "high", "low", "close", "adj_close", "volume"]
+        numeric_cols = ["open", "high", "low", "close", "adj_close", "volume"]
         for col in numeric_cols:
             if col in df.columns:
                 try:
@@ -62,8 +80,9 @@ def asset_market_raw(context):
                     context.log.error(f"Error converting column {col}: {e}")
                     raise e
 
-        if "date" in df.columns:
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        # Convert datetime column (preserves time information for intraday, sets 00:00:00 for daily)
+        if "datetime" in df.columns:
+            df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
 
         context.log.info(f"Missing values per column:\n {df.isnull().sum()}")
 
@@ -76,17 +95,20 @@ def asset_market_raw(context):
 
     raw_df = download_daily_data()
     cleaned_df = clean_data(raw_df)
+    
+    context.log.info(f"Downloaded {len(cleaned_df)} rows of {interval} data for {ticker}")
 
     log_df(cleaned_df, context, 'asset_market_raw')
     save_data(df=cleaned_df,
-              filename=f"{ticker}_daily.csv",
+              filename=f"{ticker}_{interval}.csv",
               dir=f"data/raw/{ticker}",
               context=context,
               asset="asset_market_raw"
               )
-    return Output((cleaned_df, ticker),
+    return Output((cleaned_df, ticker, interval),
                   metadata={"num_rows": cleaned_df.shape[0],
                             "num_columns": cleaned_df.shape[1],
                             "ticker": ticker,
+                            "interval": interval,
                             })
 

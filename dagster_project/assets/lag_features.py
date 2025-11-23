@@ -10,7 +10,51 @@ from .methods.logging import log_df
     kinds={"python"}
 )
 def asset_features_lagged(context, asset_market_raw):
-    def add_lag_features(df, lags=[1, 2, 3, 5, 7, 10], cols=["adj_close", "daily_return", "volume", "high", "low"]):
+    def get_interval_params(interval: str):
+        """
+        Get time-interval-aware parameters for feature engineering.
+        Returns: (lags, rolling_windows, is_intraday)
+        """
+        # Parse interval to determine if it's intraday or daily+
+        if interval.endswith('m'):
+            # Minutes: 1m, 2m, 5m, 15m, 30m, 60m, 90m
+            minutes = int(interval[:-1])
+            # For 1h data: 60 bars = 60h ≈ 7-8 trading days
+            # For intraday, we need more bars to capture same timeframe
+            bars_per_day = 390 // minutes  # 390 minutes in trading day (6.5 hours)
+            lags = [1, 2, 3, 5, 10, 20]  # bars
+            rolling_windows = [5, 10, 20, 60]  # bars
+            is_intraday = True
+        elif interval in ['1h', '60m', '90m']:
+            # Hourly data
+            bars_per_day = 6.5  # 6.5 trading hours per day
+            lags = [1, 2, 3, 6, 13, 26]  # 1h, 2h, 3h, 1d, 2d, 4d
+            rolling_windows = [6, 13, 26, 65]  # 1d, 2d, 4d, 10d
+            is_intraday = True
+        elif interval == '1d':
+            # Daily data (original behavior)
+            lags = [1, 2, 3, 5, 7, 10]
+            rolling_windows = [5, 10, 20]
+            is_intraday = False
+        elif interval in ['5d', '1wk']:
+            # Weekly data
+            lags = [1, 2, 3, 4, 8]  # weeks
+            rolling_windows = [4, 8, 12]  # weeks
+            is_intraday = False
+        elif interval in ['1mo', '3mo']:
+            # Monthly data
+            lags = [1, 2, 3, 6, 12]  # months
+            rolling_windows = [3, 6, 12]  # months
+            is_intraday = False
+        else:
+            # Default to daily parameters
+            lags = [1, 2, 3, 5, 7, 10]
+            rolling_windows = [5, 10, 20]
+            is_intraday = False
+        
+        return lags, rolling_windows, is_intraday
+    
+    def add_lag_features(df, lags, cols=["adj_close", "daily_return", "volume", "high", "low"]):
         """
         Add lagged versions of selected columns.
         EXPANDED: More lags (up to 10 days) and more columns.
@@ -32,21 +76,27 @@ def asset_features_lagged(context, asset_market_raw):
         df["daily_return"] = df["adj_close"].pct_change()
         return df
     
-    def add_multi_period_returns(df):
+    def add_multi_period_returns(df, windows):
         """
-        Add returns over multiple periods: 2d, 3d, 5d, 10d, 20d.
+        Add returns over multiple periods.
         Critical for capturing different timeframe momentum.
+        
+        Parameters:
+            windows: list of window sizes (interval-aware)
         """
-        for period in [2, 3, 5, 10, 20]:
+        for period in windows:
             df[f"return_{period}d"] = df["adj_close"].pct_change(periods=period)
         return df
     
-    def add_rolling_statistics(df):
+    def add_rolling_statistics(df, windows):
         """
         Add rolling statistics: mean, std, min, max over different windows.
         These capture local trends and volatility that LSTM needs.
+        
+        Parameters:
+            windows: list of window sizes (interval-aware)
         """
-        for window in [5, 10, 20]:
+        for window in windows:
             # Price statistics
             df[f"close_mean_{window}d"] = df["adj_close"].rolling(window=window).mean()
             df[f"close_std_{window}d"] = df["adj_close"].rolling(window=window).std()
@@ -63,12 +113,15 @@ def asset_features_lagged(context, asset_market_raw):
         
         return df
     
-    def add_price_position_features(df):
+    def add_price_position_features(df, windows):
         """
         Add features showing where current price sits relative to recent ranges.
         Critical for identifying breakouts and reversals.
+        
+        Parameters:
+            windows: list of window sizes (interval-aware)
         """
-        for window in [5, 10, 20]:
+        for window in windows:
             # Position within recent range (0 = at low, 1 = at high)
             close_min = df["adj_close"].rolling(window=window).min()
             close_max = df["adj_close"].rolling(window=window).max()
@@ -80,48 +133,67 @@ def asset_features_lagged(context, asset_market_raw):
         
         return df
     
-    def add_volume_features(df):
+    def add_volume_features(df, windows):
         """
         Add volume-based features.
         Volume often leads price changes.
+        
+        Parameters:
+            windows: list of window sizes (interval-aware)
         """
         df["volume_change"] = df["volume"].pct_change()
-        df["volume_change_5d"] = df["volume"].pct_change(periods=5)
+        # Use first window for multi-period change
+        if windows:
+            df[f"volume_change_{windows[0]}d"] = df["volume"].pct_change(periods=windows[0])
         
         # Volume ratio to recent average
-        for window in [5, 10, 20]:
+        for window in windows:
             vol_avg = df["volume"].rolling(window=window).mean()
             df[f"volume_ratio_{window}d"] = df["volume"] / (vol_avg + 1e-8)
         
         return df
     
-    def add_volatility_features(df):
+    def add_volatility_features(df, windows):
         """
         Add volatility measures beyond ATR.
+        
+        Parameters:
+            windows: list of window sizes (interval-aware)
         """
-        for window in [5, 10, 20]:
+        for window in windows:
             # High-low range as % of close
             df[f"hl_pct_{window}d"] = (
                 (df["high"] - df["low"]).rolling(window=window).mean() / df["adj_close"]
             )
         
         # Realized volatility (std of returns)
-        df["realized_vol_10d"] = df["daily_return"].rolling(window=10).std() * np.sqrt(252)
-        df["realized_vol_20d"] = df["daily_return"].rolling(window=20).std() * np.sqrt(252)
+        # Use appropriate windows based on interval
+        vol_windows = [windows[1], windows[2]] if len(windows) >= 3 else [10, 20]
+        df[f"realized_vol_{vol_windows[0]}d"] = df["daily_return"].rolling(window=vol_windows[0]).std() * np.sqrt(252)
+        df[f"realized_vol_{vol_windows[1]}d"] = df["daily_return"].rolling(window=vol_windows[1]).std() * np.sqrt(252)
         
         return df
 
     # Load cleaned data
-    df, ticker = asset_market_raw
+    df, ticker, interval = asset_market_raw
+    
+    context.log.info(f"Processing features for interval: {interval}")
+
+    # Get interval-aware parameters
+    lags, rolling_windows, is_intraday = get_interval_params(interval)
+    context.log.info(f"Using lags: {lags}, rolling windows: {rolling_windows}, intraday: {is_intraday}")
+    
+    # Calculate multi-period return windows based on rolling windows
+    return_windows = rolling_windows[:4] if len(rolling_windows) > 3 else rolling_windows + [rolling_windows[-1] * 2]
 
     # Add all features
     df = add_daily_return(df)
-    df = add_multi_period_returns(df)
-    df = add_rolling_statistics(df)
-    df = add_price_position_features(df)
-    df = add_volume_features(df)
-    df = add_volatility_features(df)
-    df = add_lag_features(df, lags=[1, 2, 3, 5, 7, 10], cols=["adj_close", "daily_return", "volume", "high", "low"])
+    df = add_multi_period_returns(df, return_windows)
+    df = add_rolling_statistics(df, rolling_windows)
+    df = add_price_position_features(df, rolling_windows)
+    df = add_volume_features(df, rolling_windows)
+    df = add_volatility_features(df, rolling_windows)
+    df = add_lag_features(df, lags=lags, cols=["adj_close", "daily_return", "volume", "high", "low"])
 
     # Clean up any infinity or extreme values that might have been created
     # Replace inf/-inf with NaN, then drop them
@@ -134,13 +206,14 @@ def asset_features_lagged(context, asset_market_raw):
 
     log_df(df, context, 'asset_features_lagged')
     save_data(df=df,
-              filename=f"{ticker}_daily_lagged.csv",
+              filename=f"{ticker}_{interval}_lagged.csv",
               dir=f"data/processed/{ticker}",
               context=context,
               asset="asset_features_lagged"
               )
-    return Output((df, ticker),
+    return Output((df, ticker, interval),
                   metadata={"num_rows": df.shape[0],
                             "num_columns": df.shape[1],
                             "ticker": ticker,
+                            "interval": interval,
                             })
