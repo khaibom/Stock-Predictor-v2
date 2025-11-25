@@ -221,6 +221,10 @@ training_config_schema_reg = {
     "reg_alpha": Field(float, default_value=0.5, description="L1 regularization (increased)"),
     "reg_lambda": Field(float, default_value=2.0, description="L2 regularization (increased)"),
     "early_stopping_rounds": Field(int, default_value=30, description="Early stopping patience (stop sooner)"),
+    # Hyperparameter tuning options
+    "enable_tuning": Field(bool, default_value=False, description="Enable automatic hyperparameter tuning"),
+    "tuning_max_trials": Field(int, default_value=1000, description="Number of trials for hyperparameter search"),
+    "tuning_timeout": Field(int, default_value=3600, description="Timeout for tuning in seconds (1 hour = 3600)"),
 }
 
 
@@ -262,6 +266,50 @@ def xgb_trained_model_reg(context, asset_preprocessed_data):
     context.log.info(f"  X_val: {X_val.shape}, y_val: {y_val_reg.shape}")
     context.log.info(f"  X_test: {X_test.shape}, y_test: {y_test_reg.shape}")
     context.log.info(f"  Number of features: {len(features)}")
+
+    # Check if hyperparameter tuning is enabled
+    enable_tuning = context.op_config.get("enable_tuning", False)
+    
+    if enable_tuning:
+        context.log.info("[XGB REGRESSION] Hyperparameter tuning ENABLED")
+        from .methods.hyperparameter_tuning import tune_xgboost_hyperparameters
+        
+        tuning_max_trials = context.op_config.get("tuning_max_trials", 1000)
+        tuning_timeout = context.op_config.get("tuning_timeout", 3600)
+        
+        # Run hyperparameter tuning
+        best_params, study = tune_xgboost_hyperparameters(
+            X_train, y_train_reg,
+            X_val, y_val_reg,
+            task='regression',
+            n_trials=tuning_max_trials,
+            timeout=tuning_timeout,
+            context=context
+        )
+        
+        # Save best hyperparameters
+        import json
+        best_hps_path = MODEL_DIR / ticker / f"{ticker}_best_hyperparams_reg.json"
+        best_hps_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(best_hps_path, 'w') as f:
+            json.dump(best_params, f, indent=2)
+        context.log.info(f"[XGB REGRESSION] Best hyperparameters saved to {best_hps_path}")
+        
+        # Update parameters with best values
+        n_estimators = best_params.get('n_estimators', n_estimators)
+        max_depth = best_params.get('max_depth', max_depth)
+        learning_rate = best_params.get('learning_rate', learning_rate)
+        subsample = best_params.get('subsample', subsample)
+        colsample_bytree = best_params.get('colsample_bytree', colsample_bytree)
+        min_child_weight = best_params.get('min_child_weight', min_child_weight)
+        gamma = best_params.get('gamma', gamma)
+        reg_alpha = best_params.get('reg_alpha', reg_alpha)
+        reg_lambda = best_params.get('reg_lambda', reg_lambda)
+        early_stopping_rounds = 50  # Fixed for final training
+        
+        context.log.info("[XGB REGRESSION] Building final model with best hyperparameters")
+    else:
+        context.log.info("[XGB REGRESSION] Using manual hyperparameters from config")
 
     # Build model
     model = xgb.XGBRegressor(
@@ -492,6 +540,10 @@ training_config_schema_cls = {
     "reg_lambda": Field(float, default_value=3.0, description="L2 regularization (increased)"),
     "early_stopping_rounds": Field(int, default_value=20, description="Early stopping patience (stop sooner)"),
     "scale_pos_weight": Field(float, default_value=1.0, description="Balance of positive vs negative weights"),
+    # Hyperparameter tuning options
+    "enable_tuning": Field(bool, default_value=False, description="Enable automatic hyperparameter tuning"),
+    "tuning_max_trials": Field(int, default_value=1000, description="Number of trials for hyperparameter search"),
+    "tuning_timeout": Field(int, default_value=3600, description="Timeout for tuning in seconds (1 hour = 3600)"),
 }
 
 
@@ -542,6 +594,51 @@ def xgb_trained_model_cls(context, asset_preprocessed_data):
         pos_count = counts[1] if unique[1] == 1 else counts[0]
         scale_pos_weight = neg_count / pos_count
         context.log.info(f"[XGB CLASSIFICATION] Auto-calculated scale_pos_weight: {scale_pos_weight:.2f}")
+
+    # Check if hyperparameter tuning is enabled
+    enable_tuning = context.op_config.get("enable_tuning", False)
+    
+    if enable_tuning:
+        context.log.info("[XGB CLASSIFICATION] Hyperparameter tuning ENABLED")
+        from .methods.hyperparameter_tuning import tune_xgboost_hyperparameters
+        
+        tuning_max_trials = context.op_config.get("tuning_max_trials", 1000)
+        tuning_timeout = context.op_config.get("tuning_timeout", 3600)
+        
+        # Run hyperparameter tuning
+        best_params, study = tune_xgboost_hyperparameters(
+            X_train, y_train_cls,
+            X_val, y_val_cls,
+            task='classification',
+            n_trials=tuning_max_trials,
+            timeout=tuning_timeout,
+            context=context
+        )
+        
+        # Save best hyperparameters
+        import json
+        best_hps_path = MODEL_DIR / ticker / f"{ticker}_best_hyperparams_cls.json"
+        best_hps_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(best_hps_path, 'w') as f:
+            json.dump(best_params, f, indent=2)
+        context.log.info(f"[XGB CLASSIFICATION] Best hyperparameters saved to {best_hps_path}")
+        
+        # Update parameters with best values
+        n_estimators = best_params.get('n_estimators', n_estimators)
+        max_depth = best_params.get('max_depth', max_depth)
+        learning_rate = best_params.get('learning_rate', learning_rate)
+        subsample = best_params.get('subsample', subsample)
+        colsample_bytree = best_params.get('colsample_bytree', colsample_bytree)
+        min_child_weight = best_params.get('min_child_weight', min_child_weight)
+        gamma = best_params.get('gamma', gamma)
+        reg_alpha = best_params.get('reg_alpha', reg_alpha)
+        reg_lambda = best_params.get('reg_lambda', reg_lambda)
+        scale_pos_weight = best_params.get('scale_pos_weight', scale_pos_weight)
+        early_stopping_rounds = 50  # Fixed for final training
+        
+        context.log.info("[XGB CLASSIFICATION] Building final model with best hyperparameters")
+    else:
+        context.log.info("[XGB CLASSIFICATION] Using manual hyperparameters from config")
 
     # Build model
     model = xgb.XGBClassifier(

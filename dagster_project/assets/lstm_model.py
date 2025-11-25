@@ -456,6 +456,11 @@ training_config_schema_reg = {
     "patience": Field(int, default_value=120, description="Early stopping patience (re-enabled)"),
     "use_bidirectional": Field(bool, default_value=True, description="Use bidirectional LSTM layers"),
     "l2_reg": Field(float, default_value=1e-5, description="L2 regularization factor (reduced)"),
+    # Hyperparameter tuning options
+    "enable_tuning": Field(bool, default_value=False, description="Enable automatic hyperparameter tuning"),
+    "tuning_type": Field(str, default_value="bayesian", description="Tuning method: 'bayesian', 'random', or 'hyperband'"),
+    "tuning_max_trials": Field(int, default_value=50, description="Number of trials for hyperparameter search"),
+    "tuning_executions_per_trial": Field(int, default_value=1, description="Number of executions per trial (for averaging)"),
 }
 
 
@@ -506,20 +511,79 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
     # Build model
     n_features = X_train_seq.shape[-1]
     context.log.info(f"[REGRESSION] Building enhanced LSTM model with {n_features} features")
-    context.log.info(f"[REGRESSION] Using bidirectional: {use_bidirectional}, L2 reg: {l2_reg}")
-    context.log.info(f"[REGRESSION] Using directional loss to prevent mode collapse")
     
-    model = build_lstm_model_reg(
-        lookback=lookback,
-        n_features=n_features,
-        lstm_units=lstm_units,
-        dense_units=dense_units,
-        dropout=dropout,
-        learning_rate=learning_rate,
-        use_bidirectional=use_bidirectional,
-        l2_reg=l2_reg,
-        use_directional_loss=True,  # Prevents model from predicting all zeros
-    )
+    # Check if hyperparameter tuning is enabled
+    enable_tuning = context.op_config.get("enable_tuning", False)
+    
+    if enable_tuning:
+        context.log.info("[REGRESSION] Hyperparameter tuning ENABLED")
+        from .methods.hyperparameter_tuning import tune_lstm_hyperparameters, get_best_hyperparameters_summary
+        
+        tuning_type = context.op_config.get("tuning_type", "bayesian")
+        tuning_max_trials = context.op_config.get("tuning_max_trials", 50)
+        tuning_executions_per_trial = context.op_config.get("tuning_executions_per_trial", 1)
+        
+        # Run hyperparameter tuning
+        best_hps, tuned_model, tuner = tune_lstm_hyperparameters(
+            X_train_seq, y_train_seq,
+            X_val_seq, y_val_seq,
+            lookback=lookback,
+            n_features=n_features,
+            model_type='regression',
+            max_trials=tuning_max_trials,
+            executions_per_trial=tuning_executions_per_trial,
+            tuner_type=tuning_type,
+            project_name=f"{ticker}_lstm_reg",
+            directory='models/tuning',
+            context=context
+        )
+        
+        # Extract best hyperparameters
+        best_hps_dict = get_best_hyperparameters_summary(best_hps)
+        lstm_units = best_hps_dict['lstm_units']
+        dense_units = best_hps_dict['dense_units']
+        dropout = best_hps_dict['dropout']
+        learning_rate = best_hps_dict['learning_rate']
+        use_bidirectional = best_hps_dict['use_bidirectional']
+        l2_reg = best_hps_dict['l2_reg']
+        
+        # Save best hyperparameters
+        import json
+        best_hps_path = MODEL_DIR / ticker / f"{ticker}_best_hyperparams_reg.json"
+        best_hps_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(best_hps_path, 'w') as f:
+            json.dump(best_hps_dict, f, indent=2)
+        context.log.info(f"[REGRESSION] Best hyperparameters saved to {best_hps_path}")
+        
+        # Build final model with best hyperparameters
+        context.log.info(f"[REGRESSION] Building final model with best hyperparameters")
+        model = build_lstm_model_reg(
+            lookback=lookback,
+            n_features=n_features,
+            lstm_units=lstm_units,
+            dense_units=dense_units,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            use_bidirectional=use_bidirectional,
+            l2_reg=l2_reg,
+            use_directional_loss=True,
+        )
+    else:
+        context.log.info("[REGRESSION] Using manual hyperparameters from config")
+        context.log.info(f"[REGRESSION] Using bidirectional: {use_bidirectional}, L2 reg: {l2_reg}")
+        context.log.info(f"[REGRESSION] Using directional loss to prevent mode collapse")
+        
+        model = build_lstm_model_reg(
+            lookback=lookback,
+            n_features=n_features,
+            lstm_units=lstm_units,
+            dense_units=dense_units,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            use_bidirectional=use_bidirectional,
+            l2_reg=l2_reg,
+            use_directional_loss=True,  # Prevents model from predicting all zeros
+        )
 
     context.log.info("[REGRESSION] Model architecture:")
     model.summary(print_fn=lambda x: context.log.info(x))
@@ -546,7 +610,7 @@ def lstm_trained_model_reg(context, asset_preprocessed_data):
             filepath=str(MODEL_DIR / ticker / f"{ticker}_best_model_reg.keras"),
             monitor="val_loss",
             save_best_only=True,
-            verbose=0,
+            verbose=1,
         ),
     ]
 
@@ -790,6 +854,11 @@ training_config_schema_cls = {
     "patience": Field(int, default_value=180, description="Early stopping patience (re-enabled)"),
     "use_bidirectional": Field(bool, default_value=True, description="Use bidirectional LSTM layers (enabled for better context)"),
     "l2_reg": Field(float, default_value=1e-5, description="L2 regularization factor (reduced)"),
+    # Hyperparameter tuning options
+    "enable_tuning": Field(bool, default_value=False, description="Enable automatic hyperparameter tuning"),
+    "tuning_type": Field(str, default_value="bayesian", description="Tuning method: 'bayesian', 'random', or 'hyperband'"),
+    "tuning_max_trials": Field(int, default_value=50, description="Number of trials for hyperparameter search"),
+    "tuning_executions_per_trial": Field(int, default_value=1, description="Number of executions per trial (for averaging)"),
 }
 
 
@@ -855,19 +924,79 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
     # Build model
     n_features = X_train_seq.shape[-1]
     context.log.info(f"[CLASSIFICATION] Building enhanced LSTM model with {n_features} features")
-    context.log.info(f"[CLASSIFICATION] Using bidirectional: {use_bidirectional}, L2 reg: {l2_reg}")
     
-    model = build_lstm_model_cls(
-        lookback=lookback,
-        n_features=n_features,
-        num_classes=num_classes,
-        lstm_units=lstm_units,
-        dense_units=dense_units,
-        dropout=dropout,
-        learning_rate=learning_rate,
-        use_bidirectional=use_bidirectional,
-        l2_reg=l2_reg,
-    )
+    # Check if hyperparameter tuning is enabled
+    enable_tuning = context.op_config.get("enable_tuning", False)
+    
+    if enable_tuning:
+        context.log.info("[CLASSIFICATION] Hyperparameter tuning ENABLED")
+        from .methods.hyperparameter_tuning import tune_lstm_hyperparameters, get_best_hyperparameters_summary
+        
+        tuning_type = context.op_config.get("tuning_type", "bayesian")
+        tuning_max_trials = context.op_config.get("tuning_max_trials", 50)
+        tuning_executions_per_trial = context.op_config.get("tuning_executions_per_trial", 1)
+        
+        # Run hyperparameter tuning
+        best_hps, tuned_model, tuner = tune_lstm_hyperparameters(
+            X_train_seq, y_train_seq,
+            X_val_seq, y_val_seq,
+            lookback=lookback,
+            n_features=n_features,
+            model_type='classification',
+            num_classes=num_classes,
+            max_trials=tuning_max_trials,
+            executions_per_trial=tuning_executions_per_trial,
+            tuner_type=tuning_type,
+            project_name=f"{ticker}_lstm_cls",
+            directory='models/tuning',
+            context=context
+        )
+        
+        # Extract best hyperparameters
+        best_hps_dict = get_best_hyperparameters_summary(best_hps)
+        lstm_units = best_hps_dict['lstm_units']
+        dense_units = best_hps_dict['dense_units']
+        dropout = best_hps_dict['dropout']
+        learning_rate = best_hps_dict['learning_rate']
+        use_bidirectional = best_hps_dict['use_bidirectional']
+        l2_reg = best_hps_dict['l2_reg']
+        
+        # Save best hyperparameters
+        import json
+        best_hps_path = MODEL_DIR / ticker / f"{ticker}_best_hyperparams_cls.json"
+        best_hps_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(best_hps_path, 'w') as f:
+            json.dump(best_hps_dict, f, indent=2)
+        context.log.info(f"[CLASSIFICATION] Best hyperparameters saved to {best_hps_path}")
+        
+        # Build final model with best hyperparameters
+        context.log.info(f"[CLASSIFICATION] Building final model with best hyperparameters")
+        model = build_lstm_model_cls(
+            lookback=lookback,
+            n_features=n_features,
+            num_classes=num_classes,
+            lstm_units=lstm_units,
+            dense_units=dense_units,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            use_bidirectional=use_bidirectional,
+            l2_reg=l2_reg,
+        )
+    else:
+        context.log.info("[CLASSIFICATION] Using manual hyperparameters from config")
+        context.log.info(f"[CLASSIFICATION] Using bidirectional: {use_bidirectional}, L2 reg: {l2_reg}")
+        
+        model = build_lstm_model_cls(
+            lookback=lookback,
+            n_features=n_features,
+            num_classes=num_classes,
+            lstm_units=lstm_units,
+            dense_units=dense_units,
+            dropout=dropout,
+            learning_rate=learning_rate,
+            use_bidirectional=use_bidirectional,
+            l2_reg=l2_reg,
+        )
 
     context.log.info("[CLASSIFICATION] Model architecture:")
     model.summary(print_fn=lambda x: context.log.info(x))
@@ -903,7 +1032,7 @@ def lstm_trained_model_cls(context, asset_preprocessed_data):
             monitor="val_accuracy",
             save_best_only=True,
             mode='max',
-            verbose=0,
+            verbose=1,
         ),
     ]
 
