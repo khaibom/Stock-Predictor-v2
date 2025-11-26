@@ -1,0 +1,8 @@
+{
+  "lstm_units": 96,
+  "dense_units": 64,
+  "dropout": 0.4,
+  "learning_rate": 0.0010977615890373476,
+  "use_bidirectional": false,
+  "l2_reg": 1e-06
+}
